@@ -4,7 +4,21 @@
   <div class="card">
     <div class="card-header">Register</div>
     <div class="card-body">
-      <form id="registerForm">
+      <!-- Success message after registration -->
+      <div id="registrationSuccess" class="alert alert-success" style="display: none;">
+        <h4 class="alert-heading">Registration Successful!</h4>
+        <p>Thank you for registering with TodoApp. A verification email has been sent to your email address.</p>
+        <p>Please check your inbox and click on the verification link to activate your account.</p>
+        <hr>
+        <p class="mb-0">If you don't see the email, please check your spam folder or <a href="/auth/login-page">click here</a> to request a new verification email.</p>
+      </div>
+
+      <!-- Error message for registration -->
+      <div id="registrationError" class="alert alert-danger" style="display: none;">
+      </div>
+
+      <form id="registerForm" style="display: block;">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <div class="form-row">
           <div class="form-group col-md-6">
             <label>Email</label>
@@ -72,9 +86,23 @@
             type="password"
             class="form-control"
             name="password"
+            id="password"
             autocomplete="new-password"
             required
           />
+          <small id="passwordHelp" class="form-text text-muted">
+            Password must meet the following requirements:
+          </small>
+          <ul id="password-requirements" class="small text-muted">
+            <li id="length-check">At least 8 characters long</li>
+            <li id="uppercase-check">Contains at least one uppercase letter</li>
+            <li id="lowercase-check">Contains at least one lowercase letter</li>
+            <li id="number-check">Contains at least one number</li>
+            <li id="special-check">Contains at least one special character</li>
+          </ul>
+          <div id="password-strength" class="progress mt-2" style="height: 5px;">
+            <div class="progress-bar bg-danger" role="progressbar" style="width: 0%"></div>
+          </div>
         </div>
         <div class="form-group">
           <label>Verify Password</label>
@@ -82,9 +110,13 @@
             type="password"
             class="form-control"
             name="password2"
+            id="password2"
             autocomplete="new-password"
             required
           />
+          <div id="password-match" class="invalid-feedback">
+            Passwords do not match
+          </div>
         </div>
         <button
           type="submit"

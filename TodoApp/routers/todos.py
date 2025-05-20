@@ -1,4 +1,7 @@
 from typing import Annotated
+import logging
+from sqlalchemy.exc import SQLAlchemyError
+from jose.exceptions import JWTError
 
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -6,9 +9,14 @@ from fastapi import Depends, HTTPException, Path, APIRouter, Request
 from starlette import status
 from ..models import Todos
 from ..database import SessionLocal
-from .auth import get_current_user
+from .auth import get_current_user, get_current_user_from_cookie
 from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from ..sanitize import sanitize_todo_input, sanitize_html
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory="TodoApp/templates")
 router = APIRouter(
@@ -29,7 +37,7 @@ def get_db():
 # This is the dependency that will be used to get the database session
 db_dependency = Annotated[Session, Depends(get_db)]
 
-user_dependency = Annotated[dict, Depends(get_current_user)]
+user_dependency = Annotated[dict, Depends(get_current_user_from_cookie)]
 
 
 # This is the request model that will be used to create a new todo item
@@ -49,40 +57,71 @@ def redirect_to_login():
 ### Pages ####
 
 @router.get("/todo-page")
-async def render_todo_page(request: Request, db: db_dependency):
+async def render_todo_page(request: Request, db: db_dependency, user: user_dependency = None):
     try:
-        user = await get_current_user(request.cookies.get("access_token"))
         if user is None:
+            logger.info("User not authenticated, redirecting to login page")
             return redirect_to_login()
 
         todos = db.query(Todos).filter(Todos.owner_id == user.get('id')).all()
         return templates.TemplateResponse("todo.html", {"request": request, "todos": todos, "user": user})
 
-    except:
+    except JWTError as e:
+        logger.error(f"JWT error in render_todo_page: {str(e)}")
+        return redirect_to_login()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error in render_todo_page: {str(e)}")
+        return redirect_to_login()
+    except AttributeError as e:
+        logger.error(f"Attribute error in render_todo_page: {str(e)}")
+        return redirect_to_login()
+    except Exception as e:
+        logger.error(f"Unexpected error in render_todo_page: {str(e)}")
         return redirect_to_login()
 
 
 @router.get("/add-todo-page")
-async def render_todo_page(request: Request):
+async def render_add_todo_page(request: Request, user: user_dependency = None):
     try:
-        user = await get_current_user(request.cookies.get("access_token"))
         if user is None:
+            logger.info("User not authenticated, redirecting to login page")
             return redirect_to_login()
         return templates.TemplateResponse("add-todo.html", {"request": request, "user": user})
-    except:
+    except JWTError as e:
+        logger.error(f"JWT error in render_add_todo_page: {str(e)}")
+        return redirect_to_login()
+    except AttributeError as e:
+        logger.error(f"Attribute error in render_add_todo_page: {str(e)}")
+        return redirect_to_login()
+    except Exception as e:
+        logger.error(f"Unexpected error in render_add_todo_page: {str(e)}")
         return redirect_to_login()
 
 
 @router.get("/edit-todo-page/{todo_id}")
-async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependency):
+async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependency, user: user_dependency = None):
     try:
-        user = await get_current_user(request.cookies.get("access_token"))
         if user is None:
+            logger.info("User not authenticated, redirecting to login page")
             return redirect_to_login()
 
         todo = db.query(Todos).filter(Todos.id == todo_id).first()
+        if todo is None:
+            logger.warning(f"Todo with id {todo_id} not found")
+            return RedirectResponse(url="/todos/todo-page", status_code=status.HTTP_302_FOUND)
+
         return templates.TemplateResponse("edit-todo.html", {"request": request, "todo": todo, "user": user})
-    except:
+    except JWTError as e:
+        logger.error(f"JWT error in render_edit_todo_page: {str(e)}")
+        return redirect_to_login()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error in render_edit_todo_page: {str(e)}")
+        return redirect_to_login()
+    except AttributeError as e:
+        logger.error(f"Attribute error in render_edit_todo_page: {str(e)}")
+        return redirect_to_login()
+    except Exception as e:
+        logger.error(f"Unexpected error in render_edit_todo_page: {str(e)}")
         return redirect_to_login()
 
 
@@ -109,7 +148,10 @@ async def read_todo(user: user_dependency, db: db_dependency, todo_id: int = Pat
 async def create_todo(user: user_dependency, db: db_dependency, todo_request: TodoRequest):
     if user is None:
         raise HTTPException(status_code=401, detail="User not authenticated.")
-    todo_model = Todos(**todo_request.model_dump(), owner_id=user.get('id'))
+
+    # Sanitize user input to prevent XSS attacks
+    sanitized_data = sanitize_todo_input(todo_request.model_dump())
+    todo_model = Todos(**sanitized_data, owner_id=user.get('id'))
 
     db.add(todo_model)
     db.commit()
@@ -123,8 +165,11 @@ async def update_todo(user: user_dependency, db: db_dependency, todo_request: To
     if todo_model is None:
         raise HTTPException(status_code=404, detail="Todo not found.")
 
-    todo_model.title = todo_request.title
-    todo_model.description = todo_request.description
+    # Sanitize user input to prevent XSS attacks
+    sanitized_data = sanitize_todo_input(todo_request.model_dump())
+
+    todo_model.title = sanitized_data['title']
+    todo_model.description = sanitized_data['description']
     todo_model.priority = todo_request.priority
     todo_model.complete = todo_request.complete
 

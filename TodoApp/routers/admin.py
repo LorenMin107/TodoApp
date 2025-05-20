@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, Path, APIRouter
 from starlette import status
 from ..models import Todos
 from ..database import SessionLocal
-from .auth import get_current_user
+from .auth import get_current_user_from_cookie
 
 router = APIRouter(
     prefix="/admin",
@@ -25,7 +25,7 @@ def get_db():
 # This is the dependency that will be used to get the database session
 db_dependency = Annotated[Session, Depends(get_db)]
 
-user_dependency = Annotated[dict, Depends(get_current_user)]
+user_dependency = Annotated[dict, Depends(get_current_user_from_cookie)]
 
 
 @router.get("/todo", status_code=status.HTTP_200_OK)

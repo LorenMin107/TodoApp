@@ -1,14 +1,20 @@
 from datetime import timedelta, datetime, timezone
+import os
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Cookie
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Annotated
+from typing import Annotated, Optional
 
 from starlette import status
+from starlette.responses import RedirectResponse
 
 from ..database import SessionLocal
 from ..models import Users
+from ..rate_limiter import check_rate_limit, record_failed_attempt, reset_attempts
+from ..password_validator import validate_password
+from ..email_utils import generate_verification_token, send_verification_email, generate_password_reset_token, send_password_reset_email
+from ..sanitize import sanitize_user_input, sanitize_error_message
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -19,7 +25,9 @@ router = APIRouter(
     tags=["auth"]
 )
 
-SECRET_KEY = '54e781fbc13df7df8bf720d38db6e1cb2ac9b6f3dc94605ceb7483b40de25974'
+# Get SECRET_KEY from environment variable with a fallback for development
+# In production, always set this environment variable
+SECRET_KEY = os.environ.get('SECRET_KEY', '54e781fbc13df7df8bf720d38db6e1cb2ac9b6f3dc94605ceb7483b40de25974')
 ALGORITHM = 'HS256'
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -39,6 +47,16 @@ class CreateUserRequest(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    refresh_token: Optional[str] = None
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordReset(BaseModel):
+    password: str
+    confirm_password: str
 
 
 def get_db():
@@ -63,6 +81,199 @@ def render_login_page(request: Request):
 def render_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
+@router.get("/logout")
+def logout(response: Response):
+    # Clear the access_token cookie
+    response.delete_cookie(key="access_token", path="/")
+    # Clear the refresh_token cookie
+    response.delete_cookie(key="refresh_token", path="/auth/")
+    # Redirect to login page
+    return {"status": "success"}
+
+@router.get("/verify-email")
+async def verify_email(token: str, db: db_dependency):
+    """
+    Verify a user's email address using the token sent to their email.
+    """
+    # Find the user with this verification token
+    user = db.query(Users).filter(Users.verification_token == token).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token"
+        )
+
+    # Update the user's email_verified status
+    user.email_verified = True
+    # Clear the verification token
+    user.verification_token = None
+
+    # Commit the changes to the database
+    db.add(user)
+    db.commit()
+
+    # Redirect to login page with a success message
+    return RedirectResponse(
+        url="/auth/login-page?verified=true",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+@router.post("/resend-verification")
+async def resend_verification(request: ResendVerificationRequest, db: db_dependency):
+    """
+    Resend a verification email to the user.
+    """
+    # Find the user with this email
+    user = db.query(Users).filter(Users.email == request.email).first()
+
+    if not user:
+        # Don't reveal that the email doesn't exist for security reasons
+        return {"message": "If your email is registered, a verification email has been sent."}
+
+    # Check if the email is already verified
+    if user.email_verified:
+        return {"message": "Your email is already verified. Please log in."}
+
+    # Generate a new verification token
+    verification_token = generate_verification_token()
+    user.verification_token = verification_token
+
+    # Commit the changes to the database
+    db.add(user)
+    db.commit()
+
+    # Send a new verification email
+    send_verification_email(
+        to_email=user.email,
+        token=verification_token,
+        username=user.username
+    )
+
+    return {"message": "A new verification email has been sent. Please check your inbox."}
+
+@router.get("/forgot-password-page")
+def render_forgot_password_page(request: Request):
+    """
+    Render the forgot password page.
+    """
+    return templates.TemplateResponse("forgot-password.html", {"request": request})
+
+@router.get("/reset-password-page")
+def render_reset_password_page(request: Request, token: str):
+    """
+    Render the reset password page.
+    """
+    return templates.TemplateResponse("reset-password.html", {"request": request, "token": token})
+
+@router.post("/forgot-password")
+async def forgot_password(request: PasswordResetRequest, db: db_dependency):
+    """
+    Process a password reset request.
+
+    This endpoint:
+    1. Finds the user with the provided email
+    2. Generates a password reset token
+    3. Sends a password reset email
+    """
+    # Find the user with this email
+    user = db.query(Users).filter(Users.email == request.email).first()
+
+    if not user:
+        # Don't reveal that the email doesn't exist for security reasons
+        return {"message": "If your email is registered, a password reset link has been sent."}
+
+    # Generate a new password reset token and expiration time
+    reset_token, expires = generate_password_reset_token()
+    user.password_reset_token = reset_token
+    user.password_reset_expires = expires
+
+    # Commit the changes to the database
+    db.add(user)
+    db.commit()
+
+    # Send a password reset email
+    send_password_reset_email(
+        to_email=user.email,
+        token=reset_token,
+        username=user.username
+    )
+
+    return {"message": "If your email is registered, a password reset link has been sent."}
+
+@router.get("/reset-password")
+async def reset_password_page(token: str, request: Request, db: db_dependency):
+    """
+    Render the reset password page after validating the token.
+    """
+    # Find the user with this reset token
+    user = db.query(Users).filter(Users.password_reset_token == token).first()
+
+    if not user or user.password_reset_expires < datetime.now():
+        # Token is invalid or expired
+        return RedirectResponse(
+            url="/auth/login-page?reset_error=invalid_token",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    # Token is valid, render the reset password page
+    return templates.TemplateResponse(
+        "reset-password.html", 
+        {"request": request, "token": token}
+    )
+
+@router.post("/reset-password")
+async def reset_password(token: str, password_reset: PasswordReset, db: db_dependency):
+    """
+    Process a password reset.
+
+    This endpoint:
+    1. Validates the reset token
+    2. Validates the new password
+    3. Updates the user's password
+    """
+    # Find the user with this reset token
+    user = db.query(Users).filter(Users.password_reset_token == token).first()
+
+    if not user or user.password_reset_expires < datetime.now():
+        # Token is invalid or expired
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token"
+        )
+
+    # Validate that passwords match
+    if password_reset.password != password_reset.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match"
+        )
+
+    # Validate password strength
+    is_valid, error_message = validate_password(password_reset.password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+
+    # Update the user's password
+    user.hashed_password = bcrypt_context.hash(password_reset.password)
+
+    # Clear the reset token
+    user.password_reset_token = None
+    user.password_reset_expires = None
+
+    # Commit the changes to the database
+    db.add(user)
+    db.commit()
+
+    # Return success
+    return {"message": "Password has been reset successfully. You can now log in with your new password."}
+
 # Endpoints
 def authenticate_user(username: str, password: str, db):
     user = db.query(Users).filter(Users.username == username).first()
@@ -74,7 +285,14 @@ def authenticate_user(username: str, password: str, db):
 
 
 def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    encode = {'sub': username, 'id': user_id, 'role': role}
+    encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': 'access'}
+    expires = datetime.now(timezone.utc) + expires_delta
+    encode.update({'exp': expires})
+    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(username: str, user_id: int, role: str, expires_delta: timedelta):
+    encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': 'refresh'}
     expires = datetime.now(timezone.utc) + expires_delta
     encode.update({'exp': expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -93,27 +311,231 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
+async def get_current_user_from_cookie(access_token: str = Cookie(None)):
+    """
+    Get the current user from the access_token cookie.
+    This function is used as a dependency for endpoints that need to authenticate the user.
+    """
+    if access_token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    try:
+        payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Verify this is an access token
+        token_type = payload.get('token_type')
+        if token_type != 'access':
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+
+        username: str = payload.get('sub')
+        user_id: int = payload.get('id')
+        user_role: str = payload.get('role')
+        if username is None or user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return {'username': username, 'id': user_id, 'user_role': user_role}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(db: db_dependency, create_user_request: CreateUserRequest):
+    # Validate password strength
+    is_valid, error_message = validate_password(create_user_request.password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+
+    # Check if email already exists
+    existing_user = db.query(Users).filter(Users.email == create_user_request.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    # Check if username already exists
+    existing_user = db.query(Users).filter(Users.username == create_user_request.username).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+
+    # Generate verification token
+    verification_token = generate_verification_token()
+
+    # Sanitize user input to prevent XSS attacks
+    user_data = {
+        'email': create_user_request.email,
+        'username': create_user_request.username,
+        'first_name': create_user_request.first_name,
+        'last_name': create_user_request.last_name,
+        'role': create_user_request.role,
+        'phone_number': create_user_request.phone_number
+    }
+    sanitized_data = sanitize_user_input(user_data)
+
     create_user_model = Users(
-        email=create_user_request.email,
-        username=create_user_request.username,
-        first_name=create_user_request.first_name,
-        last_name=create_user_request.last_name,
-        role=create_user_request.role,
+        email=sanitized_data['email'],
+        username=sanitized_data['username'],
+        first_name=sanitized_data['first_name'],
+        last_name=sanitized_data['last_name'],
+        role=sanitized_data['role'],
         hashed_password=bcrypt_context.hash(create_user_request.password),
         is_active=True,
-        phone_number=create_user_request.phone_number
+        phone_number=sanitized_data['phone_number'],
+        email_verified=False,
+        verification_token=verification_token
     )
 
     db.add(create_user_model)
     db.commit()
 
+    # Send verification email
+    send_verification_email(
+        to_email=create_user_request.email,
+        token=verification_token,
+        username=create_user_request.username
+    )
+
+    # Return success with a message about verification
+    return {"message": "User created successfully. Please check your email to verify your account."}
+
+
+@router.post("/refresh-token", response_model=Token)
+async def refresh_access_token(response: Response, refresh_token: str = Cookie(None)):
+    """
+    Endpoint to refresh the access token using a valid refresh token.
+    """
+    if refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing"
+        )
+
+    try:
+        # Decode and validate the refresh token
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        # Verify this is a refresh token
+        token_type = payload.get('token_type')
+        if token_type != 'refresh':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+
+        # Extract user information from the refresh token
+        username: str = payload.get('sub')
+        user_id: int = payload.get('id')
+        user_role: str = payload.get('role')
+
+        if username is None or user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+
+        # Create a new access token
+        new_access_token = create_access_token(
+            username=username,
+            user_id=user_id,
+            role=user_role,
+            expires_delta=timedelta(minutes=20)
+        )
+
+        # Set the new access token as a cookie
+        response.set_cookie(
+            key="access_token",
+            value=new_access_token,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=1200,  # 20 minutes in seconds
+            path="/"
+        )
+
+        # Return the new access token
+        return {
+            "access_token": new_access_token,
+            "token_type": "bearer"
+        }
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+
 
 @router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+async def login_for_access_token(request: Request, response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+    # Check if the request is rate limited before processing
+    # This will raise an HTTPException with status code 429 if rate limited
+    check_rate_limit(request, form_data.username)
+
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
-    return {'access_token': token, 'token_type': 'bearer'}
+        # Record failed login attempt
+        record_failed_attempt(request, form_data.username)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid username or password"
+        )
+
+    # Check if email is verified
+    if not user.email_verified:
+        # Generate a new verification token
+        verification_token = generate_verification_token()
+        user.verification_token = verification_token
+        db.add(user)
+        db.commit()
+
+        # Send a new verification email
+        send_verification_email(
+            to_email=user.email,
+            token=verification_token,
+            username=user.username
+        )
+
+        # Record failed login attempt due to unverified email
+        record_failed_attempt(request, form_data.username)
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email not verified. A new verification email has been sent."
+        )
+
+    # Authentication successful, reset failed attempts
+    reset_attempts(request, form_data.username)
+
+    # Create access token (short-lived, 20 minutes)
+    access_token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
+
+    # Create refresh token (long-lived, 7 days)
+    refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
+
+    # Set the access token as an HttpOnly and Secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Prevents JavaScript access
+        secure=True,    # Only sent over HTTPS
+        samesite="strict",  # Prevents CSRF attacks
+        max_age=1200,   # 20 minutes in seconds
+        path="/"        # Available across the entire domain
+    )
+
+    # Set the refresh token as an HttpOnly and Secure cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,  # Prevents JavaScript access
+        secure=True,    # Only sent over HTTPS
+        samesite="strict",  # Prevents CSRF attacks
+        max_age=604800,  # 7 days in seconds
+        path="/auth/"    # Only available for auth routes
+    )
+
+    return {'access_token': access_token, 'refresh_token': refresh_token, 'token_type': 'bearer'}

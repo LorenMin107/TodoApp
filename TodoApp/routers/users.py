@@ -6,8 +6,10 @@ from fastapi import Depends, HTTPException, Path, APIRouter
 from starlette import status
 from ..models import Users
 from ..database import SessionLocal
-from .auth import get_current_user
+from .auth import get_current_user_from_cookie
+from ..password_validator import validate_password
 from passlib.context import CryptContext
+from ..sanitize import sanitize_html
 
 router = APIRouter(
     prefix="/user",
@@ -26,7 +28,7 @@ def get_db():
 
 # This is the dependency that will be used to get the database session
 db_dependency = Annotated[Session, Depends(get_db)]
-user_dependency = Annotated[dict, Depends(get_current_user)]
+user_dependency = Annotated[dict, Depends(get_current_user_from_cookie)]
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -49,7 +51,16 @@ async def change_password(user: user_dependency, db: db_dependency, user_verific
     user_model = db.query(Users).filter(Users.id == user.get('id')).first()
 
     if not bcrypt_context.verify(user_verification.password, user_model.hashed_password):
-        raise HTTPException(status_code=401, detail="Error on password change")
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    # Validate new password strength
+    is_valid, error_message = validate_password(user_verification.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+
     user_model.hashed_password = bcrypt_context.hash(user_verification.new_password)
     db.add(user_model)
     db.commit()
@@ -60,6 +71,8 @@ async def change_phone_number(user: user_dependency, db: db_dependency, phone_nu
     if user is None:
         raise HTTPException(status_code=401, detail="User not authenticated.")
     user_model = db.query(Users).filter(Users.id == user.get('id')).first()
-    user_model.phone_number = phone_number
+    # Sanitize phone_number to prevent XSS attacks
+    sanitized_phone_number = sanitize_html(phone_number)
+    user_model.phone_number = sanitized_phone_number
     db.add(user_model)
     db.commit()

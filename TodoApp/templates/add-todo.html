@@ -7,6 +7,7 @@
         </div>
         <div class="card-body">
             <form id="todoForm">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="form-group">
                     <label>Title</label>
                     <input type="text" class="form-control" name="title" required>

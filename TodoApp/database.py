@@ -1,16 +1,39 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import QueuePool
+import os
+from dotenv import load_dotenv
 
-# This is the database URI that will be used to connect to the database
-SQLALCHEMY_DATABASE_URI = 'sqlite:///todosapp.db'
+# Load environment variables from .env file
+load_dotenv()
 
-# SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:test1234!@localhost/TodoApplicationDatabase'
-# SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:test1234!@127.0.0.1/TodoApplicationDatabase'
+# Database configuration from environment variables
+DB_NAME = os.environ.get('DB_NAME', 'todosapp.db')
 
-# This is the database engine that will be used to connect to the database (remove connect_args for PostgreSQL and MySQL)
-engine = create_engine(SQLALCHEMY_DATABASE_URI, connect_args={
-    'check_same_thread': False})
+# Using SQLite as the only database type
+SQLALCHEMY_DATABASE_URI = f'sqlite:///{DB_NAME}'
+
+# Configure connection pooling parameters
+POOL_SIZE = 5  # Default number of connections to keep open
+MAX_OVERFLOW = 10  # Maximum number of connections to create above pool_size
+POOL_TIMEOUT = 30  # Timeout for getting a connection from the pool
+POOL_RECYCLE = 1800  # Recycle connections after 30 minutes
+
+# This is the database engine that will be used to connect to the database
+# SQLite-specific connect_args are included for SQLite only
+connect_args = {'check_same_thread': False} if SQLALCHEMY_DATABASE_URI.startswith('sqlite') else {}
+
+# Create engine with connection pooling
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URI,
+    poolclass=QueuePool,
+    pool_size=POOL_SIZE,
+    max_overflow=MAX_OVERFLOW,
+    pool_timeout=POOL_TIMEOUT,
+    pool_recycle=POOL_RECYCLE,
+    connect_args=connect_args
+)
 
 # This creates a new session for each request
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
