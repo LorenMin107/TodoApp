@@ -7,6 +7,7 @@ if (todoForm) {
     const form = event.target;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    const addTodoButton = document.getElementById("addTodoButton");
 
     const payload = {
       title: data.title,
@@ -27,6 +28,7 @@ if (todoForm) {
 
       if (response.ok) {
         form.reset(); // Clear the form
+        window.location.href = "/todos/todo-page";
       } else {
         // Handle error
         const errorData = await response.json();
@@ -49,6 +51,7 @@ if (editTodoForm) {
     const data = Object.fromEntries(formData.entries());
     var url = window.location.pathname;
     const todoId = url.substring(url.lastIndexOf("/") + 1);
+    const editTodoButton = document.getElementById("editTodoButton");
 
     const payload = {
       title: data.title,
@@ -83,6 +86,7 @@ if (editTodoForm) {
   document.getElementById("deleteButton").addEventListener("click", async function () {
     var url = window.location.pathname;
     const todoId = url.substring(url.lastIndexOf("/") + 1);
+    const deleteButton = document.getElementById("deleteButton");
 
     try {
       const response = await fetchWithTokenRefresh(`/todos/todo/${todoId}`, {
@@ -136,6 +140,7 @@ if (loginForm) {
 
     const form = event.target;
     const formData = new FormData(form);
+    const loginButton = document.getElementById("loginButton");
 
     const payload = new URLSearchParams();
     for (const [key, value] of formData.entries()) {
@@ -206,10 +211,12 @@ if (loginForm) {
             // Other errors
             showLoginError(`Error: ${errorData.detail}`);
           }
+
         }
       } catch (error) {
         console.error("Error:", error);
         showLoginError("An error occurred. Please try again.");
+
       } finally {
         // Reset the reCAPTCHA widget
         try {
@@ -223,6 +230,7 @@ if (loginForm) {
     } catch (error) {
       console.error("reCAPTCHA Error:", error);
       showLoginError("An error occurred with the reCAPTCHA verification. Please try again.");
+
     }
   });
 }
@@ -258,6 +266,7 @@ if (resendVerificationForm) {
     const form = event.target;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    const resendButton = document.getElementById("resendButton");
 
     try {
       const response = await fetchWithTokenRefresh("/auth/resend-verification", {
@@ -428,6 +437,7 @@ if (registerForm) {
     const form = event.target;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    const registerButton = document.getElementById("registerButton");
 
     // Validate password strength
     const { checks, strength } = validatePasswordStrength(data.password);
