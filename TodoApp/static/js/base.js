@@ -155,6 +155,14 @@ if (loginForm) {
       if (response.ok) {
         // Handle success (e.g., redirect to dashboard)
         const data = await response.json();
+
+        // Check if 2FA is required
+        if (data.requires_2fa) {
+          // Redirect to 2FA verification page
+          window.location.href = data.redirect_url;
+          return;
+        }
+
         // No need to set cookie here as it's now set by the server with HttpOnly and Secure flags
 
         // Schedule token refresh
@@ -404,7 +412,6 @@ if (registerForm) {
       username: data.username,
       first_name: data.firstname,
       last_name: data.lastname,
-      role: data.role,
       phone_number: data.phone_number,
       password: data.password,
     };

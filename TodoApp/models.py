@@ -18,6 +18,8 @@ class Users(Base):
     verification_token = Column(String, nullable=True)
     password_reset_token = Column(String, nullable=True)
     password_reset_expires = Column(DateTime, nullable=True)
+    totp_secret = Column(String, nullable=True)
+    is_2fa_enabled = Column(Boolean, default=False)
 
 
 class Todos(Base):

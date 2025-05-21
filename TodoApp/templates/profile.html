@@ -1,0 +1,134 @@
+{% include 'layout.html' %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            User Profile
+        </div>
+        <div class="card-body">
+            <!-- Alert for displaying error messages -->
+            {% if error %}
+            <div class="alert alert-danger" role="alert">
+                {% if error == "2fa_already_enabled" %}
+                    Two-factor authentication is already enabled for your account.
+                {% else %}
+                    {{ error }}
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Alert for displaying success messages -->
+            {% if success %}
+            <div class="alert alert-success" role="alert">
+                {% if success == "2fa_enabled" %}
+                    Two-factor authentication has been successfully enabled for your account.
+                {% elif success == "2fa_disabled" %}
+                    Two-factor authentication has been successfully disabled for your account.
+                {% else %}
+                    {{ success }}
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>Account Information</h4>
+                    <table class="table">
+                        <tr>
+                            <th>Username:</th>
+                            <td>{{ db_user.username }}</td>
+                        </tr>
+                        <tr>
+                            <th>Email:</th>
+                            <td>{{ db_user.email }}</td>
+                        </tr>
+                        <tr>
+                            <th>Name:</th>
+                            <td>{{ db_user.first_name }} {{ db_user.last_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Phone Number:</th>
+                            <td>{{ db_user.phone_number }}</td>
+                        </tr>
+                        <tr>
+                            <th>Role:</th>
+                            <td>{{ db_user.role }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h4>Security Settings</h4>
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Two-Factor Authentication</h5>
+                            <p class="card-text">
+                                Two-factor authentication adds an extra layer of security to your account by requiring a verification code from your authenticator app in addition to your password.
+                            </p>
+                            {% if db_user.is_2fa_enabled %}
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle"></i> Two-factor authentication is enabled.
+                                </div>
+                                <button id="disable2FAButton" class="btn btn-danger">Disable 2FA</button>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> Two-factor authentication is not enabled.
+                                </div>
+                                <a href="/auth/setup-2fa-page" class="btn btn-primary">Enable 2FA</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Password</h5>
+                            <p class="card-text">
+                                It's a good practice to change your password regularly.
+                            </p>
+                            <button id="changePasswordButton" class="btn btn-primary">Change Password</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <a href="/todos/todo-page" class="btn btn-secondary">Back to Todos</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Handle disable 2FA button click
+    const disable2FAButton = document.getElementById("disable2FAButton");
+    if (disable2FAButton) {
+        disable2FAButton.addEventListener("click", async function() {
+            if (confirm("Are you sure you want to disable two-factor authentication? This will make your account less secure.")) {
+                try {
+                    const response = await fetchWithTokenRefresh("/auth/disable-2fa", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-Token": getCsrfToken(),
+                        }
+                    });
+
+                    if (response.ok) {
+                        // Redirect to profile page with success message
+                        window.location.href = "/user/profile?success=2fa_disabled";
+                    } else {
+                        const errorData = await response.json();
+                        alert(`Error: ${sanitizeClientSide(errorData.detail || "An error occurred")}`);
+                    }
+                } catch (error) {
+                    console.error("Error:", error);
+                    alert("An error occurred. Please try again.");
+                }
+            }
+        });
+    }
+
+    // TODO: Implement change password functionality
+    const changePasswordButton = document.getElementById("changePasswordButton");
+    if (changePasswordButton) {
+        changePasswordButton.addEventListener("click", function() {
+            alert("Change password functionality will be implemented soon.");
+        });
+    }
+</script>

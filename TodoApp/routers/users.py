@@ -2,19 +2,23 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from fastapi import Depends, HTTPException, Path, APIRouter
+from fastapi import Depends, HTTPException, Path, APIRouter, Request
 from starlette import status
+from starlette.responses import RedirectResponse
 from ..models import Users
 from ..database import SessionLocal
 from .auth import get_current_user_from_cookie
 from ..password_validator import validate_password
 from passlib.context import CryptContext
 from ..sanitize import sanitize_html
+from fastapi.templating import Jinja2Templates
 
 router = APIRouter(
     prefix="/user",
     tags=["user"]
 )
+
+templates = Jinja2Templates(directory="TodoApp/templates")
 
 
 # This is the database engine that will be used to connect to the database
@@ -76,3 +80,28 @@ async def change_phone_number(user: user_dependency, db: db_dependency, phone_nu
     user_model.phone_number = sanitized_phone_number
     db.add(user_model)
     db.commit()
+
+
+@router.get('/profile')
+async def profile_page(request: Request, user: user_dependency, db: db_dependency):
+    """
+    Render the user profile page.
+    """
+    if user is None:
+        return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Get the user from the database
+    db_user = db.query(Users).filter(Users.id == user.get('id')).first()
+    if not db_user:
+        return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
+
+    return templates.TemplateResponse(
+        "profile.html", 
+        {
+            "request": request, 
+            "user": user,
+            "db_user": db_user,
+            "error": request.query_params.get("error"),
+            "success": request.query_params.get("success")
+        }
+    )

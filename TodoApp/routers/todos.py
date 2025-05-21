@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, Path, APIRouter, Request
 from starlette import status
 from ..models import Todos
 from ..database import SessionLocal
-from .auth import get_current_user, get_current_user_from_cookie
+from .auth import get_current_user, get_current_user_from_cookie, check_pending_2fa_session
 from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from ..sanitize import sanitize_todo_input, sanitize_html
@@ -48,7 +48,15 @@ class TodoRequest(BaseModel):
     complete: bool
 
 
-def redirect_to_login():
+def redirect_to_login(request: Request = None):
+    # Check if there's a pending 2FA session
+    if request:
+        has_2fa_session, _ = check_pending_2fa_session(request)
+        if has_2fa_session:
+            # Redirect to 2FA verification page instead of login page
+            return RedirectResponse(url="/auth/verify-2fa-page", status_code=status.HTTP_302_FOUND)
+
+    # No 2FA session, redirect to login page
     redirect_response = RedirectResponse(url="/auth/login-page", status_code=status.HTTP_302_FOUND)
     redirect_response.delete_cookie(key="access_token")
     return redirect_response
@@ -61,23 +69,23 @@ async def render_todo_page(request: Request, db: db_dependency, user: user_depen
     try:
         if user is None:
             logger.info("User not authenticated, redirecting to login page")
-            return redirect_to_login()
+            return redirect_to_login(request)
 
         todos = db.query(Todos).filter(Todos.owner_id == user.get('id')).all()
         return templates.TemplateResponse("todo.html", {"request": request, "todos": todos, "user": user})
 
     except JWTError as e:
         logger.error(f"JWT error in render_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except SQLAlchemyError as e:
         logger.error(f"Database error in render_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except AttributeError as e:
         logger.error(f"Attribute error in render_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except Exception as e:
         logger.error(f"Unexpected error in render_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
 
 
 @router.get("/add-todo-page")
@@ -85,17 +93,17 @@ async def render_add_todo_page(request: Request, user: user_dependency = None):
     try:
         if user is None:
             logger.info("User not authenticated, redirecting to login page")
-            return redirect_to_login()
+            return redirect_to_login(request)
         return templates.TemplateResponse("add-todo.html", {"request": request, "user": user})
     except JWTError as e:
         logger.error(f"JWT error in render_add_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except AttributeError as e:
         logger.error(f"Attribute error in render_add_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except Exception as e:
         logger.error(f"Unexpected error in render_add_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
 
 
 @router.get("/edit-todo-page/{todo_id}")
@@ -103,7 +111,7 @@ async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependenc
     try:
         if user is None:
             logger.info("User not authenticated, redirecting to login page")
-            return redirect_to_login()
+            return redirect_to_login(request)
 
         todo = db.query(Todos).filter(Todos.id == todo_id).first()
         if todo is None:
@@ -113,16 +121,16 @@ async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependenc
         return templates.TemplateResponse("edit-todo.html", {"request": request, "todo": todo, "user": user})
     except JWTError as e:
         logger.error(f"JWT error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except SQLAlchemyError as e:
         logger.error(f"Database error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except AttributeError as e:
         logger.error(f"Attribute error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
     except Exception as e:
         logger.error(f"Unexpected error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login()
+        return redirect_to_login(request)
 
 
 ### Endpoints for rendering pages ####

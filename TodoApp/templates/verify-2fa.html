@@ -1,0 +1,110 @@
+{% include 'layout.html' %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            Two-Factor Authentication
+        </div>
+        <div class="card-body">
+            <!-- Alert for displaying messages -->
+            <div id="verifyAlert" class="alert alert-danger" style="display: none;" role="alert">
+            </div>
+
+            <div class="text-center mb-4">
+                <h4>Enter Verification Code</h4>
+                <p class="text-muted">
+                    Please enter the 6-digit code from your authenticator app to complete the login process.
+                </p>
+            </div>
+
+            <form id="verify2FAForm">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                <div class="form-group">
+                    <input type="text" class="form-control" name="token" placeholder="Enter 6-digit code" 
+                           pattern="[0-9]{6}" maxlength="6" required autofocus>
+                </div>
+                <button type="submit" class="btn btn-primary">Verify</button>
+                <a href="/auth/login-page" class="btn btn-secondary">Cancel</a>
+            </form>
+
+            <div class="mt-4">
+                <p>
+                    <a class="text-primary" data-toggle="collapse" href="#troubleshootingHelp" role="button" aria-expanded="false" aria-controls="troubleshootingHelp">
+                        Having trouble? Click here for help.
+                    </a>
+                </p>
+                <div class="collapse" id="troubleshootingHelp">
+                    <div class="card card-body">
+                        <h5>Troubleshooting Tips:</h5>
+                        <ul>
+                            <li>Make sure your device's time is synchronized correctly.</li>
+                            <li>Ensure you're using the correct authenticator app.</li>
+                            <li>Check that you're entering the most recent code from your app.</li>
+                            <li>If you've lost access to your authenticator app, contact support.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Function to show error message in the alert div
+    function showVerifyError(message) {
+        const alertDiv = document.getElementById("verifyAlert");
+        if (alertDiv) {
+            alertDiv.textContent = sanitizeClientSide(message);
+            alertDiv.style.display = "block";
+        } else {
+            // Fallback to alert if the div is not found
+            alert(sanitizeClientSide(message));
+        }
+    }
+
+    // Function to hide the error message
+    function hideVerifyError() {
+        const alertDiv = document.getElementById("verifyAlert");
+        if (alertDiv) {
+            alertDiv.style.display = "none";
+        }
+    }
+
+    // Handle form submission
+    const verify2FAForm = document.getElementById("verify2FAForm");
+    if (verify2FAForm) {
+        verify2FAForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            hideVerifyError();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetchWithTokenRefresh("/auth/verify-2fa", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": getCsrfToken(),
+                    },
+                    body: JSON.stringify({ token: data.token }),
+                });
+
+                if (response.ok) {
+                    // Wait a moment for the cookie to be set before redirecting
+                    setTimeout(() => {
+                        // Redirect to the todo page on success
+                        window.location.href = "/todos/todo-page";
+                    }, 500);
+                } else {
+                    // Handle error
+                    const errorData = await response.json();
+                    showVerifyError(errorData.detail || "Invalid verification code. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showVerifyError("An error occurred. Please try again.");
+            }
+        });
+    }
+</script>

@@ -1,0 +1,115 @@
+{% include 'layout.html' %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            Set Up Two-Factor Authentication
+        </div>
+        <div class="card-body">
+            <!-- Alert for displaying messages -->
+            <div id="setupAlert" class="alert" style="display: none;" role="alert">
+            </div>
+
+            <div class="text-center mb-4">
+                <h4>Scan this QR code with your authenticator app</h4>
+                <p class="text-muted">
+                    Use an authenticator app like Google Authenticator, Microsoft Authenticator, or Authy to scan this QR code.
+                </p>
+                <div class="qr-code-container my-4">
+                    <img src="{{ qr_code }}" alt="QR Code for 2FA" class="img-fluid">
+                </div>
+                <p class="text-muted">
+                    Can't scan the QR code? Enter this code manually in your authenticator app:
+                </p>
+                <div class="secret-key-container">
+                    <code class="p-2 bg-light">{{ secret }}</code>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="mt-4">
+                <h4>Verify Setup</h4>
+                <p>Enter the 6-digit code from your authenticator app to verify the setup:</p>
+                <form id="verify2FASetupForm">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                    <div class="form-group">
+                        <input type="text" class="form-control" name="token" placeholder="Enter 6-digit code" 
+                               pattern="[0-9]{6}" maxlength="6" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Verify and Enable 2FA</button>
+                    <a href="/user/profile" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Function to show message in the alert div
+    function showSetupMessage(message, isError = false) {
+        const alertDiv = document.getElementById("setupAlert");
+        if (alertDiv) {
+            alertDiv.textContent = sanitizeClientSide(message);
+            alertDiv.className = isError ? "alert alert-danger" : "alert alert-success";
+            alertDiv.style.display = "block";
+        } else {
+            // Fallback to alert if the div is not found
+            alert(sanitizeClientSide(message));
+        }
+    }
+
+    // Function to hide the message
+    function hideSetupMessage() {
+        const alertDiv = document.getElementById("setupAlert");
+        if (alertDiv) {
+            alertDiv.style.display = "none";
+        }
+    }
+
+    // Handle form submission
+    const verify2FASetupForm = document.getElementById("verify2FASetupForm");
+    if (verify2FASetupForm) {
+        verify2FASetupForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            hideSetupMessage();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetchWithTokenRefresh("/auth/verify-2fa-setup", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": getCsrfToken(),
+                    },
+                    body: JSON.stringify({ token: data.token }),
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    // Show success message
+                    showSetupMessage(responseData.message || "Two-factor authentication has been enabled successfully.");
+                    
+                    // Disable the form
+                    form.querySelectorAll("input, button").forEach(el => el.disabled = true);
+                    
+                    // Add a redirect button
+                    const redirectButton = document.createElement("a");
+                    redirectButton.href = "/user/profile";
+                    redirectButton.className = "btn btn-success mt-3";
+                    redirectButton.textContent = "Go to Profile";
+                    form.appendChild(redirectButton);
+                } else {
+                    // Show error message
+                    showSetupMessage(responseData.detail || responseData.message || "Verification failed. Please try again.", true);
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showSetupMessage("An error occurred. Please try again.", true);
+            }
+        });
+    }
+</script>
