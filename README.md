@@ -1,121 +1,185 @@
-# TodoApp
+# SecureTodo - A Secure Todo Application
 
-A FastAPI-based Todo application with user authentication and task management features.
+SecureTodo is a robust, security-focused Todo application built with FastAPI. It implements modern security best practices to protect user data and prevent common web vulnerabilities.
 
-## Setup and Installation
+## Features
+
+### Authentication & User Management
+- Secure user registration with email verification
+- Login with username/password
+- Two-factor authentication (2FA) using TOTP
+- Password reset via email
+- User profile management
+- Role-based access control (user/admin)
+- Session management with JWT tokens
+- Automatic token refresh
+
+### Todo Management
+- Create, read, update, and delete todo items
+- Todo prioritization
+- Mark todos as complete/incomplete
+- User-specific todo lists
+
+### Security Features
+- Content Security Policy (CSP) implementation
+- Cross-Site Request Forgery (CSRF) protection
+- Input sanitization to prevent XSS attacks
+- Password strength validation
+- Rate limiting for login attempts
+- Secure cookie handling with HttpOnly and Secure flags
+- JWT token-based authentication
+- Database connection pooling
+- Comprehensive error handling and logging
+- Email verification for account changes
+- Secure password hashing with bcrypt
+
+### Admin Features
+- View all todos across users
+- Delete any todo item
+- User management (future enhancement)
+
+## Technologies Used
+
+- **Backend**: FastAPI, Python 3.8+
+- **Database**: SQLite with SQLAlchemy ORM
+- **Authentication**: JWT tokens, Passlib, PyOTP
+- **Frontend**: HTML, CSS, JavaScript, Bootstrap
+- **Email**: SMTP with Python's email library
+- **Security**: CSP, CSRF protection, input sanitization
+- **Testing**: Pytest
+
+## Installation and Setup
+
+### Prerequisites
+- Python 3.8 or higher
+- pip (Python package manager)
+
+### Installation Steps
 
 1. Clone the repository
-2. Create a virtual environment: `python -m venv fastapienv`
-3. Activate the virtual environment:
-   - Windows: `fastapienv\Scripts\activate`
-   - macOS/Linux: `source fastapienv/bin/activate`
-4. Install dependencies: `pip install -r requirements.txt`
-5. Set environment variables (see below)
-6. Run the application: `uvicorn TodoApp.main:app --reload`
+   ```bash
+   git clone https://github.com/yourusername/SecureTodo.git
+   cd SecureTodo
+   ```
 
-## Environment Variables
+2. Create and activate a virtual environment
+   ```bash
+   # Windows
+   python -m venv fastapienv
+   fastapienv\Scripts\activate
 
-For security reasons, sensitive information should be stored in environment variables rather than in the code. The application uses a `.env` file to manage environment variables locally.
+   # macOS/Linux
+   python -m venv fastapienv
+   source fastapienv/bin/activate
+   ```
 
-### Required Environment Variables
+3. Install dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- `SECRET_KEY`: Used for JWT token encryption. Generate a secure random key for production.
+4. Set up environment variables by creating a `.env` file in the project root:
+   ```
+   # Email Configuration
+   SMTP_SERVER=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USERNAME=your_email@gmail.com
+   SMTP_PASSWORD=your_app_password
+   EMAIL_FROM=your_email@gmail.com
+   APP_BASE_URL=http://localhost:8000
 
-### Database Configuration
+   # JWT Secret Key
+   SECRET_KEY=your_secure_random_key_here
 
-The application uses SQLite as the database. Configure the following database-related environment variable in the `.env` file:
+   # Database Configuration
+   DB_NAME=todosapp.db
+   ```
 
-- `DB_NAME`: The database name (default: todosapp.db)
+   You can generate a secure random key using Python:
+   ```python
+   import secrets
+   print(secrets.token_hex(32))  # Generates a 64-character hex string
+   ```
 
-### Email Verification Configuration
+5. Run the application
+   ```bash
+   uvicorn TodoApp.main:app --reload
+   ```
 
-For email verification to work, you need to configure the following email-related environment variables in the `.env` file:
-
-- `SMTP_SERVER`: The SMTP server address (default: smtp.gmail.com)
-- `SMTP_PORT`: The SMTP server port (default: 587)
-- `SMTP_USERNAME`: Your email address
-- `SMTP_PASSWORD`: Your email password or app password (for Gmail)
-- `EMAIL_FROM`: The email address that verification emails will be sent from (usually the same as SMTP_USERNAME)
-- `APP_BASE_URL`: The base URL of your application (default: http://localhost:8000)
+6. Access the application at http://localhost:8000
 
 ### Setting Up Gmail for Email Verification
 
-If you're using Gmail, you need to:
+If you're using Gmail for sending verification emails:
 
 1. Enable 2-factor authentication on your Google account
 2. Generate an App Password at https://myaccount.google.com/apppasswords
 3. Use that App Password in your `.env` file instead of your regular password
 
-### Example .env File
+## Usage
 
-Create a file named `.env` in the project root with the following content:
+### User Registration and Login
+1. Navigate to the registration page and create an account
+2. Verify your email address by clicking the link sent to your email
+3. Log in with your credentials
+4. (Optional) Set up two-factor authentication for enhanced security
 
-```
-# Email Configuration
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your_email@gmail.com
-SMTP_PASSWORD=your_app_password
-EMAIL_FROM=your_email@gmail.com
-APP_BASE_URL=http://localhost:8000
+### Managing Todos
+1. Create new todos with a title, description, and priority
+2. View your list of todos
+3. Edit existing todos
+4. Mark todos as complete
+5. Delete todos you no longer need
 
-# JWT Secret Key
-SECRET_KEY=your_secure_random_key_here
+### User Profile Management
+1. View your profile information
+2. Change your password
+3. Update your phone number
+4. Enable or disable two-factor authentication
 
-# Database Configuration
-DB_NAME=todosapp.db
-```
+### Admin Functions
+If you have admin privileges:
+1. View todos from all users
+2. Delete any todo item
 
-### Setting Environment Variables Manually
+## API Documentation
 
-If you prefer not to use a `.env` file, you can set these variables manually:
+The API documentation is available at `/docs` or `/redoc` when the application is running:
 
-#### Windows
-```
-set SECRET_KEY=your_secure_random_key_here
-set SMTP_USERNAME=your_email@gmail.com
-set SMTP_PASSWORD=your_app_password
-set EMAIL_FROM=your_email@gmail.com
-set DB_NAME=todosapp.db
-```
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
-#### macOS/Linux
-```
-export SECRET_KEY=your_secure_random_key_here
-export SMTP_USERNAME=your_email@gmail.com
-export SMTP_PASSWORD=your_app_password
-export EMAIL_FROM=your_email@gmail.com
-export DB_NAME=todosapp.db
-```
+## Security Best Practices Implemented
 
-#### In Production
-In production environments, set these environment variables according to your deployment platform's documentation.
+- **Password Security**: Passwords are hashed using bcrypt and validated for strength
+- **JWT Security**: Short-lived access tokens with refresh mechanism
+- **XSS Prevention**: Content Security Policy and input sanitization
+- **CSRF Protection**: Token-based CSRF protection for all state-changing operations
+- **Rate Limiting**: Protection against brute force attacks
+- **Secure Cookies**: HttpOnly and Secure flags to protect cookies
+- **2FA**: Optional two-factor authentication using TOTP
+- **Email Verification**: Account changes require email verification
+- **Input Validation**: All user inputs are validated and sanitized
+- **Error Handling**: Comprehensive error handling without leaking sensitive information
 
-## Generating a Secure SECRET_KEY
+## Contributing
 
-You can generate a secure random key using Python:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-```python
-import secrets
-print(secrets.token_hex(32))  # Generates a 64-character hex string
-```
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Features
+## License
 
-- User authentication with JWT tokens
-- Email verification for new user registrations
-- Todo item management (create, read, update, delete)
-- User role-based access control
-- Password strength requirements
-- CSRF protection
-- Rate limiting for login attempts
-- Secure cookie handling with HttpOnly and Secure flags
-- Content Security Policy (CSP) headers to prevent XSS attacks
-- Additional security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
-- Input sanitization to prevent XSS attacks
-- JWT token refresh mechanism for seamless user experience
-- Session timeout for inactive users (30 minutes)
-- Secure password reset functionality with email verification
-- Database connection pooling for improved performance
-- SQLite database with configuration stored in environment variables for enhanced security
-- Responsive web interface
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgements
+
+- FastAPI for the amazing web framework
+- SQLAlchemy for the ORM
+- PyJWT for JWT token handling
+- PyOTP for two-factor authentication
+- Bootstrap for the frontend styling
