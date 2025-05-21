@@ -19,13 +19,13 @@ class CSPMiddleware(BaseHTTPMiddleware):
             # Allow resources from same origin
             "default-src": "'self'",
             # Allow styles from same origin and inline styles
-            "style-src": "'self' 'unsafe-inline'",
-            # Allow scripts from same origin and inline scripts (needed for CSRF token)
-            "script-src": "'self' 'unsafe-inline'",
-            # Allow images from same origin and data URIs (for QR codes)
-            "img-src": "'self' data:",
-            # Allow fonts from same origin
-            "font-src": "'self'",
+            "style-src": "'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com",
+            # Allow scripts from same origin, inline scripts, and Google reCAPTCHA
+            "script-src": "'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com",
+            # Allow images from same origin, data URIs, and Google reCAPTCHA
+            "img-src": "'self' data: https://www.google.com https://www.gstatic.com",
+            # Allow fonts from same origin and Google
+            "font-src": "'self' https://www.gstatic.com",
             # Restrict object sources
             "object-src": "'none'",
             # Restrict base URI
@@ -34,6 +34,8 @@ class CSPMiddleware(BaseHTTPMiddleware):
             "form-action": "'self'",
             # Frame ancestors restricted to same origin (prevents clickjacking)
             "frame-ancestors": "'self'",
+            # Allow frames from Google reCAPTCHA
+            "frame-src": "https://www.google.com",
             # Block mixed content
             "block-all-mixed-content": "",
         }

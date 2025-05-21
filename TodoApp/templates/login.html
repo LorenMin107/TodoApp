@@ -1,71 +1,132 @@
 {% include 'layout.html' %}
 <div class="container">
-    <div class="card">
-        <div class="card-header">
-            Login
+  <div class="card">
+    <div class="card-header">Login</div>
+    <div class="card-body">
+      <!-- Success alert for email verification -->
+      {% if request.query_params.get('verified') == 'true' %}
+      <div
+        class="alert alert-success"
+        role="alert"
+      >
+        Your email has been successfully verified! You can now log in.
+      </div>
+      {% endif %}
+
+      <!-- Alert for displaying messages -->
+      <div
+        id="loginAlert"
+        class="alert alert-danger"
+        style="display: none"
+        role="alert"
+      ></div>
+
+      <!-- Success alert for password reset -->
+      {% if request.query_params.get('reset_success') == 'true' %}
+      <div
+        class="alert alert-success"
+        role="alert"
+      >
+        Your password has been reset successfully. You can now log in with your new password.
+      </div>
+      {% endif %}
+
+      <form id="loginForm">
+        <input
+          type="hidden"
+          name="csrf_token"
+          value="{{ request.state.csrf_token }}"
+        />
+        <div class="form-group">
+          <label>Username</label>
+          <input
+            type="text"
+            class="form-control"
+            name="username"
+            autocomplete="username"
+            required
+          />
         </div>
-        <div class="card-body">
-            <!-- Success alert for email verification -->
-            {% if request.query_params.get('verified') == 'true' %}
-            <div class="alert alert-success" role="alert">
-                Your email has been successfully verified! You can now log in.
-            </div>
-            {% endif %}
+        <div class="form-group">
+          <label>Password</label>
+          <input
+            type="password"
+            class="form-control"
+            name="password"
+            autocomplete="current-password"
+            required
+          />
+          <small class="form-text text-muted">
+            <a href="/auth/forgot-password-page">Forgot your password?</a>
+          </small>
+        </div>
+        <div class="form-group">
+          <!-- reCAPTCHA v2 widget -->
+          <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></div>
+        </div>
+        <button
+          type="submit"
+          class="btn btn-primary"
+        >
+          Login
+        </button>
+      </form>
 
-            <!-- Alert for displaying messages -->
-            <div id="loginAlert" class="alert alert-danger" style="display: none;" role="alert">
-            </div>
-
-            <!-- Success alert for password reset -->
-            {% if request.query_params.get('reset_success') == 'true' %}
-            <div class="alert alert-success" role="alert">
-                Your password has been reset successfully. You can now log in with your new password.
-            </div>
-            {% endif %}
-
-            <form id="loginForm">
-                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" class="form-control" name="username" autocomplete="username" required>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" class="form-control" name="password" autocomplete="current-password"
-                           required>
-                    <small class="form-text text-muted">
-                        <a href="/auth/forgot-password-page">Forgot your password?</a>
-                    </small>
-                </div>
-                <button type="submit" class="btn btn-primary">Login</button>
+      <!-- Verification help section -->
+      <div class="mt-4">
+        <p>
+          <a
+            class="text-primary"
+            data-toggle="collapse"
+            href="#verificationHelp"
+            role="button"
+            aria-expanded="false"
+            aria-controls="verificationHelp"
+          >
+            Need to verify your email or request a new verification link?
+          </a>
+        </p>
+        <div
+          class="collapse"
+          id="verificationHelp"
+        >
+          <div class="card card-body">
+            <p>If you haven't verified your email yet, please check your inbox for a verification link.</p>
+            <p>If you need a new verification email, please enter your email address below:</p>
+            <form id="resendVerificationForm">
+              <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ request.state.csrf_token }}"
+              />
+              <div class="form-group">
+                <input
+                  type="email"
+                  class="form-control"
+                  name="email"
+                  placeholder="Your email address"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                class="btn btn-secondary"
+              >
+                Resend Verification Email
+              </button>
             </form>
-
-            <!-- Verification help section -->
-            <div class="mt-4">
-                <p>
-                    <a class="text-primary" data-toggle="collapse" href="#verificationHelp" role="button" aria-expanded="false" aria-controls="verificationHelp">
-                        Need to verify your email or request a new verification link?
-                    </a>
-                </p>
-                <div class="collapse" id="verificationHelp">
-                    <div class="card card-body">
-                        <p>If you haven't verified your email yet, please check your inbox for a verification link.</p>
-                        <p>If you need a new verification email, please enter your email address below:</p>
-                        <form id="resendVerificationForm">
-                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-                            <div class="form-group">
-                                <input type="email" class="form-control" name="email" placeholder="Your email address" required>
-                            </div>
-                            <button type="submit" class="btn btn-secondary">Resend Verification Email</button>
-                        </form>
-                        <div id="resendAlert" class="alert mt-3" style="display: none;" role="alert">
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div
+              id="resendAlert"
+              class="alert mt-3"
+              style="display: none"
+              role="alert"
+            ></div>
+          </div>
         </div>
-        <div class="card-footer text-muted">
-            <a href="/auth/register-page"> Register? </a>
-        </div>
+      </div>
     </div>
+    <div class="card-footer text-muted">
+      <a href="/auth/register-page"> Register? </a>
+    </div>
+  </div>
 </div>

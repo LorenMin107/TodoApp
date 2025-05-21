@@ -143,50 +143,86 @@ if (loginForm) {
     }
 
     try {
-      const response = await fetch("/auth/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRF-Token": getCsrfToken(),
-        },
-        body: payload.toString(),
-      });
+      // Check if reCAPTCHA script failed to load
+      if (window.recaptchaLoadFailed) {
+        console.error("reCAPTCHA failed to load");
+        showLoginError("reCAPTCHA could not be loaded. Please check your internet connection and try again.");
+        return;
+      }
 
-      if (response.ok) {
-        // Handle success (e.g., redirect to dashboard)
-        const data = await response.json();
+      // Check if grecaptcha is defined
+      if (typeof grecaptcha === 'undefined') {
+        console.error("reCAPTCHA not loaded");
+        showLoginError("reCAPTCHA could not be loaded. Please refresh the page and try again.");
+        return;
+      }
 
-        // Check if 2FA is required
-        if (data.requires_2fa) {
-          // Redirect to 2FA verification page
-          window.location.href = data.redirect_url;
-          return;
-        }
+      // Get the reCAPTCHA v2 response
+      const recaptchaResponse = grecaptcha.getResponse();
+      if (!recaptchaResponse) {
+        showLoginError("Please complete the reCAPTCHA verification.");
+        return;
+      }
 
-        // No need to set cookie here as it's now set by the server with HttpOnly and Secure flags
+      // Send the form with the reCAPTCHA token
+      try {
+        const response = await fetch(`/auth/token?g_recaptcha_response=${encodeURIComponent(recaptchaResponse)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRF-Token": getCsrfToken(),
+          },
+          body: payload.toString(),
+        });
 
-        // Schedule token refresh
-        scheduleTokenRefresh();
+        if (response.ok) {
+          // Handle success (e.g., redirect to dashboard)
+          const data = await response.json();
 
-        // Start inactivity check
-        startInactivityCheck();
+          // Check if 2FA is required
+          if (data.requires_2fa) {
+            // Redirect to 2FA verification page
+            window.location.href = data.redirect_url;
+            return;
+          }
 
-        window.location.href = "/todos/todo-page"; // Change this to your desired redirect page
-      } else {
-        // Handle error based on status code
-        const errorData = await response.json();
+          // No need to set cookie here as it's now set by the server with HttpOnly and Secure flags
 
-        if (response.status === 429) {
-          // Rate limiting error - show specific message
-          showLoginError(`Too many failed login attempts: ${errorData.detail}`);
+          // Schedule token refresh
+          scheduleTokenRefresh();
+
+          // Start inactivity check
+          startInactivityCheck();
+
+          window.location.href = "/todos/todo-page"; // Change this to your desired redirect page
         } else {
-          // Other errors
-          showLoginError(`Error: ${errorData.detail}`);
+          // Handle error based on status code
+          const errorData = await response.json();
+
+          if (response.status === 429) {
+            // Rate limiting error - show specific message
+            showLoginError(`Too many failed login attempts: ${errorData.detail}`);
+          } else {
+            // Other errors
+            showLoginError(`Error: ${errorData.detail}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        showLoginError("An error occurred. Please try again.");
+      } finally {
+        // Reset the reCAPTCHA widget
+        try {
+          if (typeof grecaptcha !== 'undefined' && typeof grecaptcha.reset === 'function') {
+            grecaptcha.reset();
+          }
+        } catch (resetError) {
+          console.error("Error resetting reCAPTCHA:", resetError);
         }
       }
     } catch (error) {
-      console.error("Error:", error);
-      showLoginError("An error occurred. Please try again.");
+      console.error("reCAPTCHA Error:", error);
+      showLoginError("An error occurred with the reCAPTCHA verification. Please try again.");
     }
   });
 }
@@ -407,39 +443,76 @@ if (registerForm) {
       return;
     }
 
-    const payload = {
-      email: data.email,
-      username: data.username,
-      first_name: data.firstname,
-      last_name: data.lastname,
-      phone_number: data.phone_number,
-      password: data.password,
-    };
-
     try {
-      const response = await fetchWithTokenRefresh("/auth", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": getCsrfToken(),
-        },
-        body: JSON.stringify(payload),
-      });
+      // Create a JSON payload with all the user data
+      const payload = {
+        email: data.email,
+        username: data.username,
+        first_name: data.firstname,
+        last_name: data.lastname,
+        phone_number: data.phone_number,
+        password: data.password,
+      };
 
-      const responseData = await response.json();
+      // Check if reCAPTCHA script failed to load
+      if (window.recaptchaLoadFailed) {
+        console.error("reCAPTCHA failed to load");
+        showRegistrationError("reCAPTCHA could not be loaded. Please check your internet connection and try again.");
+        return;
+      }
 
-      if (response.ok) {
-        // Show success message and hide the form
-        showRegistrationSuccess();
-        // Scroll to the top of the page to ensure the message is visible
-        window.scrollTo(0, 0);
-      } else {
-        // Show error message
-        showRegistrationError(responseData.detail || responseData.message || "Registration failed");
+      // Check if grecaptcha is defined
+      if (typeof grecaptcha === 'undefined') {
+        console.error("reCAPTCHA not loaded");
+        showRegistrationError("reCAPTCHA could not be loaded. Please refresh the page and try again.");
+        return;
+      }
+
+      // Get the reCAPTCHA v2 response
+      const recaptchaResponse = grecaptcha.getResponse();
+      if (!recaptchaResponse) {
+        showRegistrationError("Please complete the reCAPTCHA verification.");
+        return;
+      }
+
+      try {
+        // Make the request with JSON data and include the reCAPTCHA response as a query parameter
+        const response = await fetchWithTokenRefresh(`/auth?g_recaptcha_response=${encodeURIComponent(recaptchaResponse)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCsrfToken(),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const responseData = await response.json();
+
+        if (response.ok) {
+          // Show success message and hide the form
+          showRegistrationSuccess();
+          // Scroll to the top of the page to ensure the message is visible
+          window.scrollTo(0, 0);
+        } else {
+          // Show error message
+          showRegistrationError(responseData.detail || responseData.message || "Registration failed");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        showRegistrationError("An error occurred. Please try again.");
+      } finally {
+        // Reset the reCAPTCHA widget
+        try {
+          if (typeof grecaptcha !== 'undefined' && typeof grecaptcha.reset === 'function') {
+            grecaptcha.reset();
+          }
+        } catch (resetError) {
+          console.error("Error resetting reCAPTCHA:", resetError);
+        }
       }
     } catch (error) {
-      console.error("Error:", error);
-      showRegistrationError("An error occurred. Please try again.");
+      console.error("reCAPTCHA Error:", error);
+      showRegistrationError("An error occurred with the reCAPTCHA verification. Please try again.");
     }
   });
 }

@@ -10,6 +10,18 @@
         // Make CSRF token available to JavaScript
         window.csrfToken = "{{ request.state.csrf_token }}";
     </script>
+    <!-- Google reCAPTCHA v2 -->
+    <!-- NOTE: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' is a test key -->
+    <!-- Replace with your actual site key before deploying to production -->
+    <script>
+        // Function to handle reCAPTCHA script loading errors
+        function recaptchaErrorCallback() {
+            console.error("reCAPTCHA failed to load");
+            // Set a global flag to indicate that reCAPTCHA failed to load
+            window.recaptchaLoadFailed = true;
+        }
+    </script>
+    <script src="https://www.google.com/recaptcha/api.js" async defer onerror="recaptchaErrorCallback()"></script>
 </head>
 <body>
 
