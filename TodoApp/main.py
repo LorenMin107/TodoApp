@@ -1,15 +1,19 @@
 from fastapi import FastAPI, Request, status, Cookie
-from .models import Base
-from .database import engine
-
-from .routers import auth, todos, admin, users
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from typing import Optional
+from jose import JWTError
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Internal modules
+from .models import Base
+from .database import engine
+from .routers import auth, todos, admin, users
 from .csrf import csrf_middleware
 from .csp import CSPMiddleware
-from jose import JWTError
-from typing import Optional
-
 
 app = FastAPI()
 
@@ -55,3 +59,9 @@ app.include_router(auth.router)
 app.include_router(todos.router)
 app.include_router(admin.router)
 app.include_router(users.router)
+
+# Run app with `python3 -m TodoApp.main`
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("TodoApp.main:app", host="localhost", port=8000, reload=True)

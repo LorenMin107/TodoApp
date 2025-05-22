@@ -93,13 +93,20 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
 
    # Database Configuration
    DB_NAME=todosapp.db
+
+   # reCAPTCHA Configuration (optional)
+   RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+   RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
    ```
 
-   You can generate a secure random key using Python:
+   c. Generate a secure random key for SECRET_KEY using Python:
    ```python
    import secrets
    print(secrets.token_hex(32))  # Generates a 64-character hex string
    ```
+
+   > **IMPORTANT**: The `.env` file contains sensitive information and should **never** be committed to version control. 
+   > The repository includes a `.gitignore` file that excludes `.env` files by default.
 
 5. Run the application
    ```bash
@@ -161,6 +168,8 @@ The API documentation is available at `/docs` or `/redoc` when the application i
 - **Email Verification**: Account changes require email verification
 - **Input Validation**: All user inputs are validated and sanitized
 - **Error Handling**: Comprehensive error handling without leaking sensitive information
+- **Environment Security**: Sensitive configuration stored in environment variables, not in code
+- **Secret Management**: Critical secrets like JWT keys are required from environment variables with no fallbacks
 
 ## Contributing
 
@@ -183,3 +192,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - PyJWT for JWT token handling
 - PyOTP for two-factor authentication
 - Bootstrap for the frontend styling
+- Passlib for password hashing
+- Python's email library for sending emails
+- SQLite for the database
+- pytest for testing
+- CSP and CSRF libraries for security
+- dotenv for environment variable management
+- email-validator for email validation

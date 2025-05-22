@@ -22,13 +22,14 @@ SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
 EMAIL_FROM = os.environ.get('EMAIL_FROM')
 APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:8000')
 
-# Log email configuration for debugging
+# Log non-sensitive email configuration for debugging
 logger.info(f"Email Configuration:")
 logger.info(f"SMTP_SERVER: {SMTP_SERVER}")
 logger.info(f"SMTP_PORT: {SMTP_PORT}")
-logger.info(f"SMTP_USERNAME: {SMTP_USERNAME}")
-logger.info(f"EMAIL_FROM: {EMAIL_FROM}")
-logger.info(f"APP_BASE_URL: {APP_BASE_URL}")
+# Don't log sensitive information like usernames and passwords
+logger.info(f"SMTP_USERNAME configured: {'Yes' if SMTP_USERNAME else 'No'}")
+logger.info(f"EMAIL_FROM configured: {'Yes' if EMAIL_FROM else 'No'}")
+logger.info(f"APP_BASE_URL configured: {'Yes' if APP_BASE_URL else 'No'}")
 logger.info(f"SMTP_PASSWORD configured: {'Yes' if SMTP_PASSWORD else 'No'}")
 
 
@@ -69,28 +70,31 @@ def send_email(to_email: str, subject: str, html_content: str, text_content: Opt
         logger.info("Starting TLS connection")
         server.starttls()  # Secure the connection
 
-        logger.info(f"Logging in with username: {SMTP_USERNAME}")
+        logger.info("Logging in with SMTP credentials")
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
-        # Send the email
-        logger.info(f"Sending email from {EMAIL_FROM} to {to_email}")
+        # Send the email (log without exposing full email addresses)
+        logger.info(
+            f"Sending email to {to_email.split('@')[0]}***@{to_email.split('@')[1] if '@' in to_email else '***'}")
         server.sendmail(EMAIL_FROM, to_email, message.as_string())
         server.quit()
         logger.info("Email sent successfully")
         return True
     except Exception as e:
-        # Log the error with detailed information
+        # Log the error without exposing sensitive information
         logger.error(f"Error sending email: {e}")
         logger.error(
-            f"Email configuration: SMTP_SERVER={SMTP_SERVER}, SMTP_PORT={SMTP_PORT}, SMTP_USERNAME={SMTP_USERNAME}, EMAIL_FROM={EMAIL_FROM}")
+            f"Email configuration: SMTP_SERVER={SMTP_SERVER}, SMTP_PORT={SMTP_PORT}, SMTP_USERNAME configured: {'Yes' if SMTP_USERNAME else 'No'}, EMAIL_FROM configured: {'Yes' if EMAIL_FROM else 'No'}")
         return False
 
 
 def send_verification_email(to_email: str, token: str, username: str) -> bool:
-    logger.info(f"Preparing verification email for {username} ({to_email}) with token {token[:10]}...")
+    # Log without exposing the token
+    logger.info(f"Preparing verification email for {username} ({to_email})")
 
     verification_url = f"{APP_BASE_URL}/auth/verify-email?token={token}"
-    logger.info(f"Verification URL: {verification_url}")
+    # Don't log the full URL as it contains the token
+    logger.info(f"Verification URL generated with base URL: {APP_BASE_URL}")
 
     subject = "Verify your TodoApp email address"
 
@@ -152,21 +156,12 @@ def send_verification_email(to_email: str, token: str, username: str) -> bool:
 
 
 def send_password_reset_email(to_email: str, token: str, username: str) -> bool:
-    """
-    Send a password reset link to the user.
-
-    Args:
-        to_email: The user's email address
-        token: The password reset token
-        username: The user's username
-
-    Returns:
-        bool: True if the email was sent successfully, False otherwise
-    """
-    logger.info(f"Preparing password reset email for {username} ({to_email}) with token {token[:10]}...")
+    # Log without exposing the token
+    logger.info(f"Preparing password reset email for {username} ({to_email})")
 
     reset_url = f"{APP_BASE_URL}/auth/reset-password?token={token}"
-    logger.info(f"Password reset URL: {reset_url}")
+    # Don't log the full URL as it contains the token
+    logger.info(f"Password reset URL generated with base URL: {APP_BASE_URL}")
 
     subject = "Reset your TodoApp password"
 

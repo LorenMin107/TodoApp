@@ -30,7 +30,9 @@ router = APIRouter(
 )
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
-ALGORITHM = 'HS256'
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is not set. Please set it in the .env file.")
+ALGORITHM = os.environ.get('ALGORITHM', 'HS256')
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
