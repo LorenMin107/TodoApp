@@ -10,7 +10,6 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
 - Two-factor authentication (2FA) using TOTP
 - Password reset via email
 - User profile management
-- Role-based access control (user/admin)
 - Session management with JWT tokens
 - Automatic token refresh
 
@@ -148,13 +147,6 @@ If you're using Gmail for sending verification emails:
 If you have admin privileges:
 1. View todos from all users
 2. Delete any todo item
-
-## API Documentation
-
-The API documentation is available at `/docs` or `/redoc` when the application is running:
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
 
 ## Security Best Practices Implemented
 
