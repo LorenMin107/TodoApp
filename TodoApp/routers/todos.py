@@ -10,10 +10,10 @@ from fastapi import Depends, HTTPException, Path, APIRouter, Request
 from starlette import status
 from ..models import Todos
 from ..database import SessionLocal
-from .auth import get_current_user, get_current_user_from_cookie, check_pending_2fa_session
+from .auth import get_current_user_from_cookie, check_pending_2fa_session
 from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from ..sanitize import sanitize_todo_input, sanitize_html
+from ..sanitize import sanitize_todo_input
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

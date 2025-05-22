@@ -9,9 +9,9 @@
             {% if error %}
             <div class="alert alert-danger" role="alert">
                 {% if error == "2fa_already_enabled" %}
-                    Two-factor authentication is already enabled for your account.
+                Two-factor authentication is already enabled for your account.
                 {% else %}
-                    {{ error }}
+                {{ error }}
                 {% endif %}
             </div>
             {% endif %}
@@ -20,13 +20,13 @@
             {% if success %}
             <div class="alert alert-success" role="alert">
                 {% if success == "2fa_enabled" %}
-                    Two-factor authentication has been successfully enabled for your account.
+                Two-factor authentication has been successfully enabled for your account.
                 {% elif success == "2fa_disabled" %}
-                    Two-factor authentication has been successfully disabled for your account.
+                Two-factor authentication has been successfully disabled for your account.
                 {% elif success == "password_changed" %}
-                    Your password has been successfully changed.
+                Your password has been successfully changed.
                 {% else %}
-                    {{ success }}
+                {{ success }}
                 {% endif %}
             </div>
             {% endif %}
@@ -63,18 +63,19 @@
                         <div class="card-body">
                             <h5 class="card-title">Two-Factor Authentication</h5>
                             <p class="card-text">
-                                Two-factor authentication adds an extra layer of security to your account by requiring a verification code from your authenticator app in addition to your password.
+                                Two-factor authentication adds an extra layer of security to your account by requiring a
+                                verification code from your authenticator app in addition to your password.
                             </p>
                             {% if db_user.is_2fa_enabled %}
-                                <div class="alert alert-success">
-                                    <i class="fas fa-check-circle"></i> Two-factor authentication is enabled.
-                                </div>
-                                <button id="disable2FAButton" class="btn btn-danger">Disable 2FA</button>
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle"></i> Two-factor authentication is enabled.
+                            </div>
+                            <button id="disable2FAButton" class="btn btn-danger">Disable 2FA</button>
                             {% else %}
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle"></i> Two-factor authentication is not enabled.
-                                </div>
-                                <a href="/auth/setup-2fa-page" class="btn btn-primary">Enable 2FA</a>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Two-factor authentication is not enabled.
+                            </div>
+                            <a href="/auth/setup-2fa-page" class="btn btn-primary">Enable 2FA</a>
                             {% endif %}
                         </div>
                     </div>
@@ -88,7 +89,8 @@
                         </div>
 
                         <!-- Change Password Modal -->
-                        <div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+                        <div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog"
+                             aria-labelledby="changePasswordModalLabel" aria-hidden="true">
                             <div class="modal-dialog" role="document">
                                 <div class="modal-content">
                                     <div class="modal-header">
@@ -103,16 +105,19 @@
                                         </div>
 
                                         <form id="changePasswordForm">
-                                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                                            <input type="hidden" name="csrf_token"
+                                                   value="{{ request.state.csrf_token }}">
 
                                             <div class="form-group">
                                                 <label>Current Password</label>
-                                                <input type="password" class="form-control" name="current_password" id="current_password" required>
+                                                <input type="password" class="form-control" name="current_password"
+                                                       id="current_password" required>
                                             </div>
 
                                             <div class="form-group">
                                                 <label>New Password</label>
-                                                <input type="password" class="form-control" name="new_password" id="new_password" required>
+                                                <input type="password" class="form-control" name="new_password"
+                                                       id="new_password" required>
                                                 <small id="passwordHelp" class="form-text text-muted">
                                                     Password must meet the following requirements:
                                                 </small>
@@ -124,13 +129,15 @@
                                                     <li id="special-check">Contains at least one special character</li>
                                                 </ul>
                                                 <div id="password-strength" class="progress mt-2" style="height: 5px;">
-                                                    <div class="progress-bar bg-danger" role="progressbar" style="width: 0%"></div>
+                                                    <div class="progress-bar bg-danger" role="progressbar"
+                                                         style="width: 0%"></div>
                                                 </div>
                                             </div>
 
                                             <div class="form-group">
                                                 <label>Confirm New Password</label>
-                                                <input type="password" class="form-control" name="confirm_new_password" id="confirm_new_password" required>
+                                                <input type="password" class="form-control" name="confirm_new_password"
+                                                       id="confirm_new_password" required>
                                                 <div id="password-match" class="invalid-feedback">
                                                     Passwords do not match
                                                 </div>
@@ -138,8 +145,11 @@
                                         </form>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                                        <button type="button" class="btn btn-primary" id="submitChangePassword">Save Changes</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel
+                                        </button>
+                                        <button type="button" class="btn btn-primary" id="submitChangePassword">Save
+                                            Changes
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -158,7 +168,7 @@
     // Handle disable 2FA button click
     const disable2FAButton = document.getElementById("disable2FAButton");
     if (disable2FAButton) {
-        disable2FAButton.addEventListener("click", async function() {
+        disable2FAButton.addEventListener("click", async function () {
             if (confirm("Are you sure you want to disable two-factor authentication? This will make your account less secure.")) {
                 try {
                     const response = await fetchWithTokenRefresh("/auth/disable-2fa", {
@@ -251,13 +261,13 @@
         // Calculate strength as percentage (20% for each check)
         const strength = Object.values(checks).filter(Boolean).length * 20;
 
-        return { checks, strength };
+        return {checks, strength};
     }
 
     // Function to update password strength UI
     function updatePasswordStrength() {
         const password = newPasswordInput.value;
-        const { checks, strength } = validatePasswordStrength(password);
+        const {checks, strength} = validatePasswordStrength(password);
 
         // Update requirement checks
         lengthCheck.className = checks.length ? "text-success" : "text-danger";
@@ -312,7 +322,7 @@
 
     // Show modal when change password button is clicked
     if (changePasswordButton) {
-        changePasswordButton.addEventListener("click", function() {
+        changePasswordButton.addEventListener("click", function () {
             // Reset form and hide alerts
             if (changePasswordForm) {
                 changePasswordForm.reset();
@@ -326,7 +336,7 @@
 
     // Handle form submission
     if (submitChangePasswordButton) {
-        submitChangePasswordButton.addEventListener("click", async function() {
+        submitChangePasswordButton.addEventListener("click", async function () {
             hidePasswordMessage();
 
             const currentPassword = currentPasswordInput.value;
@@ -334,7 +344,7 @@
             const confirmNewPassword = confirmNewPasswordInput.value;
 
             // Validate password strength
-            const { checks, strength } = validatePasswordStrength(newPassword);
+            const {checks, strength} = validatePasswordStrength(newPassword);
             const isStrongPassword = Object.values(checks).every(Boolean);
 
             if (!isStrongPassword) {
@@ -354,7 +364,7 @@
                         "Content-Type": "application/json",
                         "X-CSRF-Token": getCsrfToken(),
                     },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         password: currentPassword,
                         new_password: newPassword
                     })

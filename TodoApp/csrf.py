@@ -10,38 +10,35 @@ CSRF_HEADER_NAME = "X-CSRF-Token"
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_TOKEN_EXPIRY_SECONDS = 3600  # 1 hour
 
-# Security scheme for CSRF token in header
+# Security scheme for CSRF token in the header
 csrf_scheme = HTTPBearer(auto_error=False)
 
+
 def generate_csrf_token() -> str:
-    """Generate a secure random token for CSRF protection."""
     return secrets.token_hex(32)
 
+
 async def get_csrf_token_from_header(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(csrf_scheme),
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(csrf_scheme),
 ) -> Optional[str]:
-    """Extract CSRF token from the request header."""
     if credentials:
         return credentials.credentials
     return None
 
+
 async def get_csrf_token_from_cookie(request: Request) -> Optional[str]:
-    """Extract CSRF token from the request cookie."""
     return request.cookies.get(CSRF_COOKIE_NAME)
 
+
 async def validate_csrf_token(
-    request: Request,
-    csrf_token_header: Optional[str] = Depends(get_csrf_token_from_header),
+        request: Request,
+        csrf_token_header: Optional[str] = Depends(get_csrf_token_from_header),
 ) -> bool:
-    """
-    Validate that the CSRF token in the header matches the one in the cookie.
-    This should be used as a dependency in protected routes.
-    """
     # Skip validation for GET, HEAD, OPTIONS requests as they should be safe
     if request.method.upper() in ("GET", "HEAD", "OPTIONS"):
         return True
 
-    # Get token from cookie
+    # Get token from a cookie
     csrf_token_cookie = await get_csrf_token_from_cookie(request)
 
     # For API endpoints, check header token against cookie token
@@ -61,9 +58,9 @@ async def validate_csrf_token(
         detail="CSRF token validation failed",
     )
 
-# Middleware to inject CSRF token into request state for templates
+
+# Middleware to inject CSRF token into the request state for templates
 async def csrf_middleware(request: Request, call_next):
-    """Middleware to handle CSRF token generation and validation."""
     # Generate a new CSRF token if one doesn't exist
     csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
     if not csrf_token:

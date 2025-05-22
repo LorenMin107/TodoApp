@@ -7,25 +7,15 @@ from starlette import status
 MAX_FAILED_ATTEMPTS = 5  # Maximum number of failed attempts allowed
 LOCKOUT_PERIOD = 15  # Lockout period in minutes
 
-# In-memory storage for failed login attempts
-# In a production environment, this would be replaced with Redis or another distributed cache
-# Format: {identifier: [(timestamp1), (timestamp2), ...]}
 failed_attempts: Dict[str, List[datetime]] = {}
 
 def get_identifier(request: Request, username: str = None) -> str:
-    """
-    Generate a unique identifier for rate limiting based on IP address and optionally username.
-    Using both IP and username provides better protection against distributed attacks.
-    """
     client_ip = request.client.host if request.client else "unknown"
     if username:
         return f"{client_ip}:{username}"
     return client_ip
 
 def record_failed_attempt(request: Request, username: str = None) -> None:
-    """
-    Record a failed login attempt for the given identifier.
-    """
     identifier = get_identifier(request, username)
     now = datetime.now()
     
@@ -40,9 +30,6 @@ def record_failed_attempt(request: Request, username: str = None) -> None:
     cleanup_old_attempts()
 
 def cleanup_old_attempts() -> None:
-    """
-    Remove attempts that are older than the lockout period.
-    """
     now = datetime.now()
     cutoff_time = now - timedelta(minutes=LOCKOUT_PERIOD)
     
@@ -58,10 +45,6 @@ def cleanup_old_attempts() -> None:
             del failed_attempts[identifier]
 
 def is_rate_limited(request: Request, username: str = None) -> Tuple[bool, int]:
-    """
-    Check if the given identifier is rate limited.
-    Returns a tuple of (is_limited, remaining_attempts).
-    """
     identifier = get_identifier(request, username)
     cleanup_old_attempts()
     
@@ -85,10 +68,6 @@ def is_rate_limited(request: Request, username: str = None) -> Tuple[bool, int]:
     return True, seconds_remaining
 
 def check_rate_limit(request: Request, username: str = None) -> None:
-    """
-    Check if the request is rate limited and raise an HTTPException if it is.
-    This function can be used as a dependency in FastAPI routes.
-    """
     is_limited, value = is_rate_limited(request, username)
     
     if is_limited:
@@ -106,10 +85,6 @@ def check_rate_limit(request: Request, username: str = None) -> None:
     return value
 
 def reset_attempts(request: Request, username: str = None) -> None:
-    """
-    Reset failed attempts for the given identifier.
-    This should be called after a successful login.
-    """
     identifier = get_identifier(request, username)
     if identifier in failed_attempts:
         del failed_attempts[identifier]

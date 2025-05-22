@@ -1,7 +1,7 @@
 // Generic form submission handler
 async function handleFormSubmit(url, method, formData, contentType = "application/json", successCallback = null, errorCallback = null) {
     try {
-        // Prepare headers based on content type
+        // Prepare headers based on the content type
         const headers = {
             "X-CSRF-Token": getCsrfToken(),
         };
@@ -106,7 +106,7 @@ if (todoForm) {
         }
 
         if (!isValid) {
-            // Show error message
+            // Show an error message
             const alertDiv = document.createElement("div");
             alertDiv.className = "alert alert-danger mt-3";
             alertDiv.textContent = "Please correct the errors in the form.";
@@ -192,18 +192,18 @@ if (editTodoForm) {
         }
 
         if (!isValid) {
-            // Show error message
+            // Show an error message
             const alertDiv = document.createElement("div");
             alertDiv.className = "alert alert-danger mt-3";
             alertDiv.textContent = "Please correct the errors in the form.";
 
-            // Check if alert already exists
+            // Check if the alert already exists
             const existingAlert = editTodoForm.querySelector(".alert");
             if (existingAlert) {
                 existingAlert.remove();
             }
 
-            // Insert alert at the top of the form
+            // Insert an alert at the top of the form
             editTodoForm.insertBefore(alertDiv, editTodoForm.firstChild);
             return;
         }
@@ -867,7 +867,7 @@ function showValidationFeedback(inputElement, isValid, message) {
 
 // Initialize token refresh and inactivity check when the page loads
 document.addEventListener('DOMContentLoaded', function () {
-    // Check if user is logged in by making a lightweight request
+    // Check if a user is logged in by making a lightweight request
     fetchWithTokenRefresh('/healthy')
         .then(response => {
             if (response.ok) {
@@ -880,7 +880,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Check for timeout parameter in URL
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('timeout') === 'true') {
-                    // Show timeout message if the login page has a timeout parameter
+                    // Show a timeout message if the login page has a timeout parameter
                     const loginAlert = document.getElementById("loginAlert");
                     if (loginAlert && window.location.pathname.includes('/login-page')) {
                         loginAlert.textContent = "Your session has timed out due to inactivity. Please log in again.";
@@ -912,12 +912,12 @@ function getCookie(name) {
 
 // Helper function to get CSRF token
 function getCsrfToken() {
-    // First try to get it from the window variable set in layout.html
+    // First, try to get it from the window variable set in layout.html
     if (window.csrfToken) {
         return window.csrfToken;
     }
 
-    // If not available, try to get it from the meta tag
+    // If not available, try to get it from the meta-tag
     const metaTag = document.querySelector('meta[name="csrf-token"]');
     if (metaTag) {
         return metaTag.getAttribute('content');
@@ -962,7 +962,7 @@ function startInactivityCheck() {
         clearInterval(inactivityCheckInterval);
     }
 
-    // Set initial activity time
+    // Set the initial activity time
     updateActivity();
 
     // Check for inactivity every minute

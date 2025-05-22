@@ -16,15 +16,13 @@ SQLALCHEMY_DATABASE_URI = f'sqlite:///{DB_NAME}'
 
 # Configure connection pooling parameters
 POOL_SIZE = 5  # Default number of connections to keep open
-MAX_OVERFLOW = 10  # Maximum number of connections to create above pool_size
+MAX_OVERFLOW = 10  # Maximum number of connections to create the above pool_size
 POOL_TIMEOUT = 30  # Timeout for getting a connection from the pool
 POOL_RECYCLE = 1800  # Recycle connections after 30 minutes
 
-# This is the database engine that will be used to connect to the database
-# SQLite-specific connect_args are included for SQLite only
 connect_args = {'check_same_thread': False} if SQLALCHEMY_DATABASE_URI.startswith('sqlite') else {}
 
-# Create engine with connection pooling
+# Create an engine with connection pooling
 engine = create_engine(
     SQLALCHEMY_DATABASE_URI,
     poolclass=QueuePool,

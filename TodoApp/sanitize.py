@@ -1,17 +1,8 @@
 import html
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 
 def sanitize_html(text: Optional[str]) -> str:
-    """
-    Sanitize HTML content to prevent XSS attacks.
-    
-    Args:
-        text: The text to sanitize
-        
-    Returns:
-        Sanitized text with HTML special characters escaped
-    """
     if text is None:
         return ""
     
@@ -19,15 +10,6 @@ def sanitize_html(text: Optional[str]) -> str:
     return html.escape(text)
 
 def sanitize_js(text: Optional[str]) -> str:
-    """
-    Sanitize text that will be used in JavaScript context.
-    
-    Args:
-        text: The text to sanitize
-        
-    Returns:
-        Sanitized text safe for use in JavaScript strings
-    """
     if text is None:
         return ""
     
@@ -46,15 +28,6 @@ def sanitize_js(text: Optional[str]) -> str:
     return text
 
 def sanitize_attribute(text: Optional[str]) -> str:
-    """
-    Sanitize text that will be used in HTML attributes.
-    
-    Args:
-        text: The text to sanitize
-        
-    Returns:
-        Sanitized text safe for use in HTML attributes
-    """
     if text is None:
         return ""
     
@@ -67,26 +40,17 @@ def sanitize_attribute(text: Optional[str]) -> str:
     return text
 
 def sanitize_url(url: Optional[str]) -> str:
-    """
-    Sanitize a URL to prevent javascript: protocol and other potentially dangerous URLs.
-    
-    Args:
-        url: The URL to sanitize
-        
-    Returns:
-        Sanitized URL or empty string if the URL is potentially dangerous
-    """
     if url is None:
         return ""
     
     # Remove whitespace
     url = url.strip()
     
-    # Check for javascript: protocol and other potentially dangerous protocols
+    # Check for JavaScript: protocol and other potentially dangerous protocols
     if re.match(r'^(javascript|data|vbscript|file):', url, re.IGNORECASE):
         return ""
     
-    # For relative URLs, just return them as is
+    # For relative URLs, return them as is
     if not re.match(r'^[a-z]+:', url, re.IGNORECASE):
         return url
     
@@ -108,15 +72,6 @@ def sanitize_todo_input(todo_data: Dict[str, Any]) -> Dict[str, Any]:
     return sanitized_data
 
 def sanitize_user_input(user_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Sanitize user input data.
-    
-    Args:
-        user_data: Dictionary containing user data
-        
-    Returns:
-        Sanitized user data
-    """
     sanitized_data = dict(user_data)
     
     # Sanitize user fields that might be displayed in the UI
@@ -127,17 +82,7 @@ def sanitize_user_input(user_data: Dict[str, Any]) -> Dict[str, Any]:
     return sanitized_data
 
 def sanitize_error_message(message: Optional[str]) -> str:
-    """
-    Sanitize error messages that will be displayed to users.
-    
-    Args:
-        message: The error message to sanitize
-        
-    Returns:
-        Sanitized error message
-    """
     if message is None:
         return ""
     
-    # For error messages, we want to be extra cautious
     return sanitize_js(sanitize_html(message))

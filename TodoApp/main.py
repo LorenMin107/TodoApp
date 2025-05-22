@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status, Cookie, Depends
+from fastapi import FastAPI, Request, status, Cookie
 from .models import Base
 from .database import engine
 
@@ -26,7 +26,7 @@ app.mount("/static", StaticFiles(directory="TodoApp/static"), name="static")
 
 @app.get("/")
 async def root(request: Request, access_token: Optional[str] = Cookie(None)):
-    # If no access token is present, redirect to login page
+    # If no access token is present, redirect to the login page
     if access_token is None:
         return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_302_FOUND)
 
@@ -40,7 +40,7 @@ async def root(request: Request, access_token: Optional[str] = Cookie(None)):
 
         return RedirectResponse(url="/todos/todo-page", status_code=status.HTTP_302_FOUND)
     except JWTError:
-        # If token is invalid, redirect to login page and clear the cookie
+        # If the token is invalid, redirect to the login page and clear the cookie
         response = RedirectResponse(url="/auth/login-page", status_code=status.HTTP_302_FOUND)
         response.delete_cookie(key="access_token")
         return response

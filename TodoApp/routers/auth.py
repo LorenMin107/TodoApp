@@ -6,7 +6,7 @@ import requests
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Cookie, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Annotated, Optional, Dict, Tuple, Any
+from typing import Annotated, Optional, Dict, Tuple
 
 from starlette import status
 from starlette.responses import RedirectResponse
@@ -24,60 +24,27 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 from fastapi.templating import Jinja2Templates
 
-# No need to import any special libraries for standard reCAPTCHA v2
-# We'll use the requests library which is already imported
-
 router = APIRouter(
     prefix="/auth",
     tags=["auth"]
 )
 
-# Get SECRET_KEY from environment variable with a fallback for development
-# In production, always set this environment variable
-SECRET_KEY = os.environ.get('SECRET_KEY', '54e781fbc13df7df8bf720d38db6e1cb2ac9b6f3dc94605ceb7483b40de25974')
+SECRET_KEY = os.environ.get('SECRET_KEY')
 ALGORITHM = 'HS256'
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 # Store pending 2FA sessions
-# Format: {session_id: {"user_id": user_id, "expires": timestamp}}
 pending_2fa_sessions: Dict[str, Dict] = {}
 
-
-# Standard reCAPTCHA v2 configuration
-# The site key for your reCAPTCHA v2
-# NOTE: This is a placeholder key and should be replaced with your actual key
+# Standard reCAPTCHA v2 configuration test keys
 RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-# The secret key for your reCAPTCHA v2
-# NOTE: This is a placeholder key and should be replaced with your actual key
-# In production, this should be stored in environment variables
+# The secret key for your reCAPTCHA v2 test site key
 RECAPTCHA_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
 
-# Function to verify standard reCAPTCHA v2 response
-# Note: This function has been modified to use the standard reCAPTCHA v2 siteverify endpoint
-# instead of Google Cloud reCAPTCHA Enterprise.
-#
-# For production, you need to:
-# 1. Replace the test keys with your actual reCAPTCHA v2 keys from https://www.google.com/recaptcha/admin
-# 2. Store your secret key securely, preferably in environment variables
+
 async def verify_recaptcha(recaptcha_response: str, action: str = None) -> bool:
-    """
-    Verify a reCAPTCHA v2 response token with Google's reCAPTCHA v2 siteverify API.
-
-    This function makes API calls to the standard reCAPTCHA v2 siteverify endpoint
-    to verify the token provided by the client.
-
-    Note: The action parameter is ignored for standard reCAPTCHA v2, as it's only
-    used in reCAPTCHA v3 and Enterprise. It's kept for backward compatibility.
-
-    Args:
-        recaptcha_response (str): The reCAPTCHA v2 response token from the client
-        action (str, optional): Ignored for reCAPTCHA v2. Kept for compatibility.
-
-    Returns:
-        bool: True if verification is successful, False otherwise
-    """
     if not recaptcha_response:
         return False
 
@@ -85,8 +52,7 @@ async def verify_recaptcha(recaptcha_response: str, action: str = None) -> bool:
     if action:
         print(f"Action specified: {action} (note: not used in reCAPTCHA v2 verification)")
 
-    # Special case for test keys - always return True
-    # This allows the verification to pass even if there are issues with the Google API
+    # Special case for test keys
     if RECAPTCHA_SITE_KEY == "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" and RECAPTCHA_SECRET_KEY == "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe":
         print("Using reCAPTCHA test keys - verification automatically passes")
         return True
@@ -197,16 +163,6 @@ async def get_current_user_from_cookie(access_token: str = Cookie(None)):
 
 
 def check_pending_2fa_session(request: Request) -> Tuple[bool, Optional[str]]:
-    """
-    Check if the request has a pending 2FA session.
-
-    Args:
-        request (Request): The request object
-
-    Returns:
-        Tuple[bool, Optional[str]]: A tuple containing a boolean indicating if there's a pending 2FA session
-                                   and the session ID if there is one
-    """
     # Get the 2FA session cookie
     session_id = request.cookies.get("2fa_session")
 
@@ -255,9 +211,6 @@ def logout(response: Response):
 
 @router.get("/verify-email")
 async def verify_email(token: str, db: db_dependency):
-    """
-    Verify a user's email address using the token sent to their email.
-    """
     # Find the user with this verification token
     user = db.query(Users).filter(Users.verification_token == token).first()
 
@@ -276,7 +229,7 @@ async def verify_email(token: str, db: db_dependency):
     db.add(user)
     db.commit()
 
-    # Redirect to login page with a success message
+    # Redirect to the login page with a success message
     return RedirectResponse(
         url="/auth/login-page?verified=true",
         status_code=status.HTTP_303_SEE_OTHER
@@ -289,14 +242,10 @@ class ResendVerificationRequest(BaseModel):
 
 @router.post("/resend-verification")
 async def resend_verification(request: ResendVerificationRequest, db: db_dependency):
-    """
-    Resend a verification email to the user.
-    """
     # Find the user with this email
     user = db.query(Users).filter(Users.email == request.email).first()
 
     if not user:
-        # Don't reveal that the email doesn't exist for security reasons
         return {"message": "If your email is registered, a verification email has been sent."}
 
     # Check if the email is already verified
@@ -334,9 +283,6 @@ def render_reset_password_page(request: Request, token: str):
 @router.get("/setup-2fa-page")
 async def setup_2fa_page(request: Request, user: dict = Depends(get_current_user_from_cookie),
                          db: Session = Depends(get_db)):
-    """
-    Render the 2FA setup page.
-    """
     if user is None:
         return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -378,9 +324,6 @@ async def setup_2fa_page(request: Request, user: dict = Depends(get_current_user
 
 @router.get("/verify-2fa-page")
 async def verify_2fa_page(request: Request, session_id: str = Cookie(None, alias="2fa_session")):
-    """
-    Render the 2FA verification page during login.
-    """
     # Check if the session exists and is valid
     if session_id not in pending_2fa_sessions:
         return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
@@ -402,9 +345,6 @@ async def verify_2fa_setup(
         db: Session = Depends(get_db),
         session_id: str = Cookie(None, alias="setup_2fa_session")
 ):
-    """
-    Verify the TOTP code during setup and enable 2FA for the user.
-    """
     # Check if the session exists and is valid
     if session_id not in pending_2fa_sessions:
         raise HTTPException(
@@ -458,9 +398,6 @@ async def verify_2fa(
         db: Session = Depends(get_db),
         session_id: str = Cookie(None, alias="2fa_session")
 ):
-    """
-    Verify the TOTP code during login.
-    """
     # Check if the session exists and is valid
     if session_id not in pending_2fa_sessions:
         raise HTTPException(
@@ -497,10 +434,10 @@ async def verify_2fa(
     # Remove the session
     pending_2fa_sessions.pop(session_id, None)
 
-    # Create access token (short-lived, 20 minutes)
+    # Create an access token (short-lived, 20 minutes)
     access_token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
 
-    # Create refresh token (long-lived, 7 days)
+    # Create a refresh token (long-lived, 7 days)
     refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
 
     # Set authentication cookies
@@ -515,9 +452,6 @@ async def disable_2fa(
         db: Session = Depends(get_db),
         user: dict = Depends(get_current_user_from_cookie)
 ):
-    """
-    Disable 2FA for the user.
-    """
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -653,19 +587,6 @@ def authenticate_user(username: str, password: str, db):
 
 
 def create_token(username: str, user_id: int, role: str, expires_delta: timedelta, token_type: str = 'access'):
-    """
-    Create a JWT token with the given parameters.
-
-    Args:
-        username (str): The username to include in the token
-        user_id (int): The user ID to include in the token
-        role (str): The user role to include in the token
-        expires_delta (timedelta): How long the token should be valid
-        token_type (str, optional): The type of token ('access' or 'refresh'). Defaults to 'access'.
-
-    Returns:
-        str: The encoded JWT token
-    """
     encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': token_type}
     expires = datetime.now(timezone.utc) + expires_delta
     encode.update({'exp': expires})
@@ -673,24 +594,14 @@ def create_token(username: str, user_id: int, role: str, expires_delta: timedelt
 
 
 def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    """Create an access token for the user."""
     return create_token(username, user_id, role, expires_delta, 'access')
 
 
 def create_refresh_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    """Create a refresh token for the user."""
     return create_token(username, user_id, role, expires_delta, 'refresh')
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
-    """
-    Set the authentication cookies on the response.
-
-    Args:
-        response (Response): The response object to set cookies on
-        access_token (str): The access token to set in the cookie
-        refresh_token (str): The refresh token to set in the cookie
-    """
     # Set the access token as an HttpOnly and Secure cookie
     response.set_cookie(
         key="access_token",
@@ -729,16 +640,16 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(
-    request: Request,
-    db: db_dependency, 
-    create_user_request: CreateUserRequest,
-    g_recaptcha_response: str = None
+        request: Request,
+        db: db_dependency,
+        create_user_request: CreateUserRequest,
+        g_recaptcha_response: str = None
 ):
     # Get reCAPTCHA response from query parameters
     if g_recaptcha_response is None:
         g_recaptcha_response = request.query_params.get("g_recaptcha_response")
 
-    # Verify reCAPTCHA first with 'register' action
+    # Verify reCAPTCHA first with the 'register' action
     recaptcha_verified = await verify_recaptcha(g_recaptcha_response, action="register")
     if not recaptcha_verified:
         raise HTTPException(
@@ -762,7 +673,7 @@ async def create_user(
             detail="Email already registered"
         )
 
-    # Check if username already exists
+    # Check if the username already exists
     existing_user = db.query(Users).filter(Users.username == create_user_request.username).first()
     if existing_user:
         raise HTTPException(
@@ -812,9 +723,6 @@ async def create_user(
 
 @router.post("/refresh-token", response_model=Token)
 async def refresh_access_token(response: Response, refresh_token: str = Cookie(None)):
-    """
-    Endpoint to refresh the access token using a valid refresh token.
-    """
     if refresh_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -878,17 +786,17 @@ async def refresh_access_token(response: Response, refresh_token: str = Cookie(N
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
-    request: Request, 
-    response: Response,
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
-    db: db_dependency,
-    g_recaptcha_response: str = Form(None)
+        request: Request,
+        response: Response,
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        db: db_dependency,
+        g_recaptcha_response: str = Form(None)
 ):
     # Get reCAPTCHA response from query parameters if not in form data
     if g_recaptcha_response is None:
         g_recaptcha_response = request.query_params.get("g_recaptcha_response")
 
-    # Verify reCAPTCHA first with 'login' action
+    # Verify reCAPTCHA first with a 'login' action
     recaptcha_verified = await verify_recaptcha(g_recaptcha_response, action="login")
     if not recaptcha_verified:
         raise HTTPException(
@@ -896,7 +804,7 @@ async def login_for_access_token(
             detail="reCAPTCHA verification failed. Please try again."
         )
 
-    # Check if the request is rate limited before processing
+    # Check if the request is rate-limited before processing
     # This will raise an HTTPException with status code 429 if rate limited
     check_rate_limit(request, form_data.username)
 
@@ -909,7 +817,7 @@ async def login_for_access_token(
             detail="Invalid username or password"
         )
 
-    # Check if email is verified
+    # Check if the email is verified
     if not user.email_verified:
         # Generate a new verification token
         verification_token = generate_verification_token()
@@ -968,7 +876,7 @@ async def login_for_access_token(
     # Create access token (short-lived, 20 minutes)
     access_token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
 
-    # Create refresh token (long-lived, 7 days)
+    # Create a refresh token (long-lived, 7 days)
     refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
 
     # Set authentication cookies

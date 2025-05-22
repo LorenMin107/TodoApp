@@ -1,14 +1,7 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
 
 class CSPMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to add Content Security Policy headers to all responses.
-
-    Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate
-    certain types of attacks, including Cross-Site Scripting (XSS) and data injection attacks.
-    """
 
     async def dispatch(self, request: Request, call_next):
         # Process the request

@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from fastapi import Depends, HTTPException, Path, APIRouter, Request
+from fastapi import Depends, HTTPException, APIRouter, Request
 from starlette import status
 from starlette.responses import RedirectResponse
 from ..models import Users
@@ -84,9 +84,6 @@ async def change_phone_number(user: user_dependency, db: db_dependency, phone_nu
 
 @router.get('/profile')
 async def profile_page(request: Request, user: user_dependency, db: db_dependency):
-    """
-    Render the user profile page.
-    """
     if user is None:
         return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
 

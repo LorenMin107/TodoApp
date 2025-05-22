@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Email configuration
-# In production, these should be set as environment variables
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME')
@@ -32,34 +31,18 @@ logger.info(f"EMAIL_FROM: {EMAIL_FROM}")
 logger.info(f"APP_BASE_URL: {APP_BASE_URL}")
 logger.info(f"SMTP_PASSWORD configured: {'Yes' if SMTP_PASSWORD else 'No'}")
 
+
 def generate_verification_token() -> str:
-    """Generate a secure random token for email verification."""
     return secrets.token_urlsafe(32)
 
-def generate_password_reset_token() -> tuple:
-    """
-    Generate a secure random token for password reset and its expiration time.
 
-    Returns:
-        tuple: (token, expiration_time) where expiration_time is 1 hour from now
-    """
+def generate_password_reset_token() -> tuple:
     token = secrets.token_urlsafe(32)
     expires = datetime.now() + timedelta(hours=1)
     return token, expires
 
+
 def send_email(to_email: str, subject: str, html_content: str, text_content: Optional[str] = None) -> bool:
-    """
-    Send an email using SMTP.
-
-    Args:
-        to_email: The recipient's email address
-        subject: The email subject
-        html_content: The HTML content of the email
-        text_content: The plain text content of the email (optional)
-
-    Returns:
-        bool: True if the email was sent successfully, False otherwise
-    """
     if not SMTP_USERNAME or not SMTP_PASSWORD:
         # Log a warning that email sending is not configured
         print("Warning: SMTP credentials not configured. Email not sent.")
@@ -71,7 +54,7 @@ def send_email(to_email: str, subject: str, html_content: str, text_content: Opt
     message["From"] = EMAIL_FROM
     message["To"] = to_email
 
-    # Add plain text version (if provided)
+    # Add a plain text version (if provided)
     if text_content:
         message.attach(MIMEText(text_content, "plain"))
 
@@ -98,21 +81,12 @@ def send_email(to_email: str, subject: str, html_content: str, text_content: Opt
     except Exception as e:
         # Log the error with detailed information
         logger.error(f"Error sending email: {e}")
-        logger.error(f"Email configuration: SMTP_SERVER={SMTP_SERVER}, SMTP_PORT={SMTP_PORT}, SMTP_USERNAME={SMTP_USERNAME}, EMAIL_FROM={EMAIL_FROM}")
+        logger.error(
+            f"Email configuration: SMTP_SERVER={SMTP_SERVER}, SMTP_PORT={SMTP_PORT}, SMTP_USERNAME={SMTP_USERNAME}, EMAIL_FROM={EMAIL_FROM}")
         return False
 
+
 def send_verification_email(to_email: str, token: str, username: str) -> bool:
-    """
-    Send an email verification link to the user.
-
-    Args:
-        to_email: The user's email address
-        token: The verification token
-        username: The user's username
-
-    Returns:
-        bool: True if the email was sent successfully, False otherwise
-    """
     logger.info(f"Preparing verification email for {username} ({to_email}) with token {token[:10]}...")
 
     verification_url = f"{APP_BASE_URL}/auth/verify-email?token={token}"
@@ -175,6 +149,7 @@ def send_verification_email(to_email: str, token: str, username: str) -> bool:
         logger.error(f"Failed to send verification email to {to_email}")
 
     return result
+
 
 def send_password_reset_email(to_email: str, token: str, username: str) -> bool:
     """
