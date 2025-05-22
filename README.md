@@ -58,7 +58,7 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/SecureTodo.git
+   git clone https://github.com/LorenMin107/TodoApp.git
    cd SecureTodo
    ```
 

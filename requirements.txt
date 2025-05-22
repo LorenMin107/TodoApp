@@ -1,0 +1,30 @@
+# Web Framework
+fastapi==0.109.2
+uvicorn==0.27.1
+python-multipart==0.0.9
+jinja2==3.1.3
+starlette==0.36.3
+
+# Database
+sqlalchemy==2.0.27
+alembic==1.13.1
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.1
+requests==2.31.0
+
+# Email
+emails==0.6
+jinja2==3.1.3
+
+# Testing
+pytest==8.0.1
+pytest-asyncio==0.23.5
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2024.1
+qrcode==7.4.2
+pillow==10.2.0  # Required for QR code generation 
