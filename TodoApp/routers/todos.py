@@ -1,5 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Callable, TypeVar, Any
 import logging
+import functools
 from sqlalchemy.exc import SQLAlchemyError
 from jose.exceptions import JWTError
 
@@ -62,101 +63,113 @@ def redirect_to_login(request: Request = None):
     return redirect_response
 
 
+# Type variable for the decorator
+T = TypeVar('T')
+
+
+def handle_exceptions(func: Callable[..., T]) -> Callable[..., T]:
+    @functools.wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
+        try:
+            return await func(*args, **kwargs)
+        except JWTError as e:
+            logger.error(f"JWT error in {func.__name__}: {str(e)}")
+            # Get the request object from kwargs
+            request = kwargs.get('request')
+            return redirect_to_login(request)
+        except SQLAlchemyError as e:
+            logger.error(f"Database error in {func.__name__}: {str(e)}")
+            request = kwargs.get('request')
+            return redirect_to_login(request)
+        except AttributeError as e:
+            logger.error(f"Attribute error in {func.__name__}: {str(e)}")
+            request = kwargs.get('request')
+            return redirect_to_login(request)
+        except Exception as e:
+            logger.error(f"Unexpected error in {func.__name__}: {str(e)}")
+            request = kwargs.get('request')
+            return redirect_to_login(request)
+
+    return wrapper
+
+
+def require_auth(func: Callable[..., T]) -> Callable[..., T]:
+    @functools.wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
+        # Get the user and request objects from kwargs
+        user = kwargs.get('user')
+        request = kwargs.get('request')
+
+        if user is None:
+            logger.info(f"User not authenticated, redirecting to login page in {func.__name__}")
+            return redirect_to_login(request)
+
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
 ### Pages ####
 
 @router.get("/todo-page")
+@handle_exceptions
+@require_auth
 async def render_todo_page(request: Request, db: db_dependency, user: user_dependency = None):
-    try:
-        if user is None:
-            logger.info("User not authenticated, redirecting to login page")
-            return redirect_to_login(request)
-
-        todos = db.query(Todos).filter(Todos.owner_id == user.get('id')).all()
-        return templates.TemplateResponse("todo.html", {"request": request, "todos": todos, "user": user})
-
-    except JWTError as e:
-        logger.error(f"JWT error in render_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except SQLAlchemyError as e:
-        logger.error(f"Database error in render_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except AttributeError as e:
-        logger.error(f"Attribute error in render_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except Exception as e:
-        logger.error(f"Unexpected error in render_todo_page: {str(e)}")
-        return redirect_to_login(request)
+    todos = get_all_todos_for_user(db, user.get('id'))
+    return templates.TemplateResponse("todo.html", {"request": request, "todos": todos, "user": user})
 
 
 @router.get("/add-todo-page")
+@handle_exceptions
+@require_auth
 async def render_add_todo_page(request: Request, user: user_dependency = None):
-    try:
-        if user is None:
-            logger.info("User not authenticated, redirecting to login page")
-            return redirect_to_login(request)
-        return templates.TemplateResponse("add-todo.html", {"request": request, "user": user})
-    except JWTError as e:
-        logger.error(f"JWT error in render_add_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except AttributeError as e:
-        logger.error(f"Attribute error in render_add_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except Exception as e:
-        logger.error(f"Unexpected error in render_add_todo_page: {str(e)}")
-        return redirect_to_login(request)
+    return templates.TemplateResponse("add-todo.html", {"request": request, "user": user})
 
 
 @router.get("/edit-todo-page/{todo_id}")
+@handle_exceptions
+@require_auth
 async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependency, user: user_dependency = None):
-    try:
-        if user is None:
-            logger.info("User not authenticated, redirecting to login page")
-            return redirect_to_login(request)
+    todo = get_todo_by_id(db, todo_id)
+    if todo is None:
+        logger.warning(f"Todo with id {todo_id} not found")
+        return RedirectResponse(url="/todos/todo-page", status_code=status.HTTP_302_FOUND)
 
-        todo = db.query(Todos).filter(Todos.id == todo_id).first()
-        if todo is None:
-            logger.warning(f"Todo with id {todo_id} not found")
-            return RedirectResponse(url="/todos/todo-page", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse("edit-todo.html", {"request": request, "todo": todo, "user": user})
 
-        return templates.TemplateResponse("edit-todo.html", {"request": request, "todo": todo, "user": user})
-    except JWTError as e:
-        logger.error(f"JWT error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except SQLAlchemyError as e:
-        logger.error(f"Database error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except AttributeError as e:
-        logger.error(f"Attribute error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login(request)
-    except Exception as e:
-        logger.error(f"Unexpected error in render_edit_todo_page: {str(e)}")
-        return redirect_to_login(request)
+
+### Database query utility functions ###
+def get_all_todos_for_user(db: Session, user_id: int) -> list[Todos]:
+    return db.query(Todos).filter(Todos.owner_id == user_id).all()
+
+
+def get_todo_by_id(db: Session, todo_id: int) -> Todos:
+    return db.query(Todos).filter(Todos.id == todo_id).first()
+
+
+def get_todo_by_id_and_owner(db: Session, todo_id: int, owner_id: int) -> Todos:
+    return db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == owner_id).first()
 
 
 ### Endpoints for rendering pages ####
 @router.get("/", status_code=status.HTTP_200_OK)
+@require_auth
 async def read_all(user: user_dependency, db: db_dependency):
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not authenticated.")
-    return db.query(Todos).filter(Todos.owner_id == user.get('id')).all()
+    return get_all_todos_for_user(db, user.get('id'))
 
 
 @router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
+@require_auth
 async def read_todo(user: user_dependency, db: db_dependency, todo_id: int = Path(gt=0)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not authenticated.")
-
-    todo_model = db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).first()
+    todo_model = get_todo_by_id_and_owner(db, todo_id, user.get('id'))
     if todo_model is not None:
         return todo_model
     raise HTTPException(status_code=404, detail="Todo not found")
 
 
 @router.post("/todo", status_code=status.HTTP_201_CREATED)
+@require_auth
 async def create_todo(user: user_dependency, db: db_dependency, todo_request: TodoRequest):
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not authenticated.")
-
     # Sanitize user input to prevent XSS attacks
     sanitized_data = sanitize_todo_input(todo_request.model_dump())
     todo_model = Todos(**sanitized_data, owner_id=user.get('id'))
@@ -166,10 +179,9 @@ async def create_todo(user: user_dependency, db: db_dependency, todo_request: To
 
 
 @router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_auth
 async def update_todo(user: user_dependency, db: db_dependency, todo_request: TodoRequest, todo_id: int = Path(gt=0)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not authenticated.")
-    todo_model = db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).first()
+    todo_model = get_todo_by_id_and_owner(db, todo_id, user.get('id'))
     if todo_model is None:
         raise HTTPException(status_code=404, detail="Todo not found.")
 
@@ -186,12 +198,12 @@ async def update_todo(user: user_dependency, db: db_dependency, todo_request: To
 
 
 @router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_auth
 async def delete_todo(user: user_dependency, db: db_dependency, todo_id: int = Path(gt=0)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not authenticated.")
-    todo_model = db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).first()
+    todo_model = get_todo_by_id_and_owner(db, todo_id, user.get('id'))
     if todo_model is None:
         raise HTTPException(status_code=404, detail="Todo not found.")
-    db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).delete()
 
+    # Delete the todo
+    db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).delete()
     db.commit()

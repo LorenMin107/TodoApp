@@ -503,27 +503,8 @@ async def verify_2fa(
     # Create refresh token (long-lived, 7 days)
     refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
 
-    # Set the access token as an HttpOnly and Secure cookie
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,  # Prevents JavaScript access
-        secure=True,  # Only sent over HTTPS
-        samesite="strict",  # Prevents CSRF attacks
-        max_age=1200,  # 20 minutes in seconds
-        path="/"  # Available across the entire domain
-    )
-
-    # Set the refresh token as an HttpOnly and Secure cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,  # Prevents JavaScript access
-        secure=True,  # Only sent over HTTPS
-        samesite="strict",  # Prevents CSRF attacks
-        max_age=604800,  # 7 days in seconds
-        path="/auth/"  # Only available for auth routes
-    )
+    # Set authentication cookies
+    set_auth_cookies(response, access_token, refresh_token)
 
     # Return success
     return {"message": "Authentication successful"}
@@ -671,18 +652,66 @@ def authenticate_user(username: str, password: str, db):
     return user
 
 
-def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': 'access'}
+def create_token(username: str, user_id: int, role: str, expires_delta: timedelta, token_type: str = 'access'):
+    """
+    Create a JWT token with the given parameters.
+
+    Args:
+        username (str): The username to include in the token
+        user_id (int): The user ID to include in the token
+        role (str): The user role to include in the token
+        expires_delta (timedelta): How long the token should be valid
+        token_type (str, optional): The type of token ('access' or 'refresh'). Defaults to 'access'.
+
+    Returns:
+        str: The encoded JWT token
+    """
+    encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': token_type}
     expires = datetime.now(timezone.utc) + expires_delta
     encode.update({'exp': expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
+    """Create an access token for the user."""
+    return create_token(username, user_id, role, expires_delta, 'access')
 
 
 def create_refresh_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': 'refresh'}
-    expires = datetime.now(timezone.utc) + expires_delta
-    encode.update({'exp': expires})
-    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+    """Create a refresh token for the user."""
+    return create_token(username, user_id, role, expires_delta, 'refresh')
+
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
+    """
+    Set the authentication cookies on the response.
+
+    Args:
+        response (Response): The response object to set cookies on
+        access_token (str): The access token to set in the cookie
+        refresh_token (str): The refresh token to set in the cookie
+    """
+    # Set the access token as an HttpOnly and Secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Prevents JavaScript access
+        secure=True,  # Only sent over HTTPS
+        samesite="strict",  # Prevents CSRF attacks
+        max_age=1200,  # 20 minutes in seconds
+        path="/"  # Available across the entire domain
+    )
+
+    # Set the refresh token as an HttpOnly and Secure cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,  # Prevents JavaScript access
+        secure=True,  # Only sent over HTTPS
+        samesite="strict",  # Prevents CSRF attacks
+        max_age=604800,  # 7 days in seconds
+        path="/auth/"  # Only available for auth routes
+    )
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
@@ -823,7 +852,7 @@ async def refresh_access_token(response: Response, refresh_token: str = Cookie(N
             expires_delta=timedelta(minutes=20)
         )
 
-        # Set the new access token as a cookie
+        # Set the new access token as a cookie (reuse the existing refresh token)
         response.set_cookie(
             key="access_token",
             value=new_access_token,
@@ -942,26 +971,7 @@ async def login_for_access_token(
     # Create refresh token (long-lived, 7 days)
     refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
 
-    # Set the access token as an HttpOnly and Secure cookie
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,  # Prevents JavaScript access
-        secure=True,  # Only sent over HTTPS
-        samesite="strict",  # Prevents CSRF attacks
-        max_age=1200,  # 20 minutes in seconds
-        path="/"  # Available across the entire domain
-    )
-
-    # Set the refresh token as an HttpOnly and Secure cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,  # Prevents JavaScript access
-        secure=True,  # Only sent over HTTPS
-        samesite="strict",  # Prevents CSRF attacks
-        max_age=604800,  # 7 days in seconds
-        path="/auth/"  # Only available for auth routes
-    )
+    # Set authentication cookies
+    set_auth_cookies(response, access_token, refresh_token)
 
     return {'access_token': access_token, 'refresh_token': refresh_token, 'token_type': 'bearer'}
