@@ -219,7 +219,7 @@ async def verify_email(token: str, db: db_dependency):
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification token"
+            detail="The verification link is invalid or has expired. Please request a new verification email from the login page."
         )
 
     # Update the user's email_verified status
@@ -351,7 +351,7 @@ async def verify_2fa_setup(
     if session_id not in pending_2fa_sessions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired session"
+            detail="Your two-factor authentication setup session has expired or is invalid. Please try setting up 2FA again."
         )
 
     session = pending_2fa_sessions[session_id]
@@ -362,14 +362,14 @@ async def verify_2fa_setup(
         pending_2fa_sessions.pop(session_id, None)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Session expired"
+            detail="Your two-factor authentication setup session has expired. Please try setting up 2FA again."
         )
 
     # Verify the TOTP code
     if not verify_totp(session["secret"], request.token):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code"
+            detail="The verification code you entered is incorrect. Please make sure you're entering the current code from your authenticator app and try again."
         )
 
     # Get the user from the database
@@ -377,7 +377,7 @@ async def verify_2fa_setup(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            detail="User account not found. Please contact support if you believe this is an error."
         )
 
     # Enable 2FA for the user
@@ -545,14 +545,14 @@ async def reset_password(token: str, password_reset: PasswordReset, db: db_depen
         # Token is invalid or expired
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired password reset token"
+            detail="Your password reset link has expired or is invalid. Please request a new password reset link from the forgot password page."
         )
 
     # Validate that passwords match
     if password_reset.password != password_reset.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Passwords do not match"
+            detail="The passwords you entered don't match. Please make sure both password fields contain the same password."
         )
 
     # Validate password strength
@@ -656,7 +656,7 @@ async def create_user(
     if not recaptcha_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="reCAPTCHA verification failed. Please try again."
+            detail="Security verification failed. Please check the reCAPTCHA box and try again. If the problem persists, refresh the page."
         )
 
     # Validate password strength
@@ -672,7 +672,7 @@ async def create_user(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="This email address is already registered. Please use a different email or try logging in if you already have an account."
         )
 
     # Check if the username already exists
@@ -680,7 +680,7 @@ async def create_user(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
+            detail="This username is already taken. Please choose a different username to continue registration."
         )
 
     # Generate verification token
@@ -803,7 +803,7 @@ async def login_for_access_token(
     if not recaptcha_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="reCAPTCHA verification failed. Please try again."
+            detail="Security verification failed. Please check the reCAPTCHA box and try again. If the problem persists, refresh the page."
         )
 
     # Check if the request is rate-limited before processing
@@ -816,7 +816,7 @@ async def login_for_access_token(
         record_failed_attempt(request, form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password"
+            detail="Login failed: The username or password you entered is incorrect. Please check your credentials and try again."
         )
 
     # Check if the email is verified
@@ -839,7 +839,7 @@ async def login_for_access_token(
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email not verified. A new verification email has been sent."
+            detail="Your email address has not been verified yet. We've sent a new verification email to your inbox. Please check your email (including spam folder) and click the verification link to activate your account."
         )
 
     # Authentication successful, reset failed attempts

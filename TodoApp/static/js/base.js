@@ -39,19 +39,56 @@ async function handleFormSubmit(url, method, formData, contentType = "applicatio
             if (errorCallback) {
                 errorCallback(errorData, response.status);
             } else {
-                // Default error handling
-                alert(`Error: ${sanitizeClientSide(errorData.detail || "An error occurred")}`);
+                // Default error handling with improved formatting
+                const errorMessage = errorData.detail || "An error occurred";
+
+                // Check if there's an error container on the page
+                const errorContainer = document.querySelector(".alert-danger");
+                if (errorContainer) {
+                    // Display error in the container with better formatting
+                    errorContainer.innerHTML = `<strong>Error:</strong> ${sanitizeClientSide(errorMessage)}`;
+                    errorContainer.style.display = "block";
+
+                    // Scroll to the error message
+                    errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    // Fallback to alert if no container is found
+                    alert(`Error: ${sanitizeClientSide(errorMessage)}`);
+                }
             }
             return {success: false, error: errorData, status: response.status};
         }
     } catch (error) {
         console.error("Error:", error);
 
+        // Create a more helpful error message based on the error type
+        let errorMessage = "An error occurred while processing your request.";
+
+        // Check for network errors
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            errorMessage = "Network error: Please check your internet connection and try again.";
+        } else if (error.name === 'AbortError') {
+            errorMessage = "Request timed out. Please try again later.";
+        } else if (error.name === 'SyntaxError') {
+            errorMessage = "There was a problem processing the server response. Please try again later.";
+        }
+
         if (errorCallback) {
-            errorCallback({detail: "An error occurred. Please try again."}, 0);
+            errorCallback({detail: errorMessage}, 0);
         } else {
-            // Default error handling
-            alert("An error occurred. Please try again.");
+            // Default error handling with improved formatting
+            const errorContainer = document.querySelector(".alert-danger");
+            if (errorContainer) {
+                // Display error in the container with better formatting
+                errorContainer.innerHTML = `<strong>Error:</strong> ${sanitizeClientSide(errorMessage)}`;
+                errorContainer.style.display = "block";
+
+                // Scroll to the error message
+                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                // Fallback to alert if no container is found
+                alert(`Error: ${sanitizeClientSide(errorMessage)}`);
+            }
         }
         return {success: false, error};
     }
@@ -251,7 +288,32 @@ if (editTodoForm) {
 function showMessage(elementId, message, isError = true) {
     const alertDiv = document.getElementById(elementId);
     if (alertDiv) {
-        alertDiv.textContent = sanitizeClientSide(message);
+        // Create enhanced message with icon and formatting
+        const icon = isError 
+            ? '<i class="fas fa-exclamation-circle" aria-hidden="true"></i>' 
+            : '<i class="fas fa-check-circle" aria-hidden="true"></i>';
+
+        const title = isError ? '<strong>Error:</strong> ' : '<strong>Success:</strong> ';
+
+        // Set the HTML content with proper sanitization
+        alertDiv.innerHTML = `${icon} ${title}${sanitizeClientSide(message)}`;
+
+        // Add a dismiss button if it doesn't already have one
+        if (!alertDiv.querySelector('.close')) {
+            const dismissButton = document.createElement('button');
+            dismissButton.type = 'button';
+            dismissButton.className = 'close';
+            dismissButton.setAttribute('aria-label', 'Close');
+            dismissButton.innerHTML = '<span aria-hidden="true">&times;</span>';
+            dismissButton.addEventListener('click', function() {
+                alertDiv.style.display = 'none';
+            });
+
+            // Add the button to the alert
+            alertDiv.prepend(dismissButton);
+        }
+
+        // Show the alert
         alertDiv.style.display = "block";
 
         // Update alert class if it has alert-success or alert-danger
@@ -259,6 +321,14 @@ function showMessage(elementId, message, isError = true) {
             alertDiv.classList.remove("alert-success", "alert-danger");
             alertDiv.classList.add(isError ? "alert-danger" : "alert-success");
         }
+
+        // Add alert-dismissible class if not already present
+        if (!alertDiv.classList.contains("alert-dismissible")) {
+            alertDiv.classList.add("alert-dismissible");
+        }
+
+        // Scroll to the alert
+        alertDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
         // Fallback to alert if the div is not found
         alert(sanitizeClientSide(message));
@@ -400,11 +470,32 @@ if (loginForm) {
         // Custom error handler for login
         const handleLoginError = (errorData, status) => {
             if (status === 429) {
-                // Rate limiting error - show specific message
-                showLoginError(`Too many failed login attempts: ${errorData.detail}`);
+                // Rate limiting error - show specific message with guidance
+                showLoginError(`${errorData.detail} Please wait before trying again or use the password reset option if you've forgotten your password.`);
+            } else if (status === 401) {
+                // Authentication error - could be wrong credentials or unverified email
+                if (errorData.detail && errorData.detail.includes("email")) {
+                    // Email verification issue
+                    showLoginError(errorData.detail);
+
+                    // Automatically expand the verification help section
+                    const verificationHelp = document.getElementById("verificationHelp");
+                    if (verificationHelp) {
+                        verificationHelp.classList.add("show");
+                    }
+                } else {
+                    // Other authentication errors
+                    showLoginError(errorData.detail);
+                }
+            } else if (status === 400 && errorData.detail && errorData.detail.includes("reCAPTCHA")) {
+                // reCAPTCHA error
+                showLoginError(errorData.detail);
+
+                // Reset the reCAPTCHA
+                resetRecaptcha();
             } else {
                 // Other errors
-                showLoginError(`Error: ${errorData.detail}`);
+                showLoginError(errorData.detail || "An error occurred during login. Please try again.");
             }
         };
 
@@ -741,8 +832,53 @@ if (registerForm) {
         };
 
         // Custom error handler for registration
-        const handleRegistrationError = (errorData) => {
-            showRegistrationError(errorData.detail || errorData.message || "Registration failed");
+        const handleRegistrationError = (errorData, status) => {
+            // Extract the error message
+            const errorMessage = errorData.detail || errorData.message || "Registration failed";
+
+            // Handle specific registration errors with helpful guidance
+            if (errorMessage.includes("email") && errorMessage.includes("registered")) {
+                // Email already registered
+                showRegistrationError(errorMessage + " You can try logging in or use the 'Forgot Password' option if needed.");
+
+                // Highlight the email field
+                if (emailInput) {
+                    emailInput.classList.add("is-invalid");
+                    const feedbackElement = emailInput.nextElementSibling;
+                    if (feedbackElement && feedbackElement.classList.contains("invalid-feedback")) {
+                        feedbackElement.textContent = "This email is already registered.";
+                    }
+                }
+            } else if (errorMessage.includes("username") && errorMessage.includes("taken")) {
+                // Username already taken
+                showRegistrationError(errorMessage);
+
+                // Highlight the username field
+                if (usernameInput) {
+                    usernameInput.classList.add("is-invalid");
+                    const feedbackElement = usernameInput.nextElementSibling;
+                    if (feedbackElement && feedbackElement.classList.contains("invalid-feedback")) {
+                        feedbackElement.textContent = "This username is already taken.";
+                    }
+                }
+            } else if (errorMessage.includes("password")) {
+                // Password validation error
+                showRegistrationError(errorMessage);
+
+                // Highlight the password field
+                if (passwordInput) {
+                    passwordInput.classList.add("is-invalid");
+                }
+            } else if (errorMessage.includes("reCAPTCHA") || errorMessage.includes("security verification")) {
+                // reCAPTCHA error
+                showRegistrationError(errorMessage);
+
+                // Reset the reCAPTCHA
+                resetRecaptcha();
+            } else {
+                // Other errors
+                showRegistrationError(errorMessage);
+            }
         };
 
         try {
@@ -1040,7 +1176,8 @@ async function fetchWithTokenRefresh(url, options = {}) {
     const response = await fetch(url, options);
 
     // If unauthorized, try to refresh the token and retry
-    if (response.status === 401) {
+    // Skip token refresh for login and token endpoints
+    if (response.status === 401 && !url.includes('/auth/token') && !url.includes('/auth/refresh-token')) {
         try {
             // Refresh the token
             await refreshAccessToken();
