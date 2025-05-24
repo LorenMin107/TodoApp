@@ -51,4 +51,16 @@ class CSPMiddleware(BaseHTTPMiddleware):
         # Add Referrer-Policy header to control referrer information
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
+        # Add Strict-Transport-Security header to enforce HTTPS
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
+        # Add Permissions-Policy header to control browser features
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+        # Add X-XSS-Protection header to enable browser's XSS filtering
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+
+        # Add X-Content-Security-Policy as a fallback for older browsers
+        response.headers["X-Content-Security-Policy"] = csp_header_value
+
         return response

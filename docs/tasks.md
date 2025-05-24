@@ -35,10 +35,14 @@ This document contains a prioritized list of actionable tasks to improve the Sec
    - Implement progressive delays for repeated failed attempts
    - Add IP-based rate limiting in addition to username-based
 
-6. [ ] Implement security headers
-   - Add Strict-Transport-Security header
-   - Add Permissions-Policy header
-   - Ensure all security headers are properly configured
+6. [x] Implement security headers
+   - Add Strict-Transport-Security header ✓
+   - Add Permissions-Policy header ✓
+   - Ensure all security headers are properly configured ✓
+   - Added HSTS header with max-age=31536000, includeSubDomains, and preload
+   - Added Permissions-Policy header restricting camera, microphone, geolocation, and interest-cohort
+   - Added X-XSS-Protection and X-Content-Security-Policy headers
+   - Created test to verify all security headers are set correctly
 
 7. [ ] Conduct security audit
    - Perform dependency vulnerability scanning

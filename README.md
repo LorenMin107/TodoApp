@@ -21,6 +21,7 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
 
 ### Security Features
 - Content Security Policy (CSP) implementation
+- HTTP Security Headers (HSTS, Permissions-Policy, X-Content-Type-Options, etc.)
 - Cross-Site Request Forgery (CSRF) protection
 - Input sanitization to prevent XSS attacks
 - Password strength validation
@@ -162,6 +163,13 @@ If you have admin privileges:
 - **Error Handling**: Comprehensive error handling without leaking sensitive information
 - **Environment Security**: Sensitive configuration stored in environment variables, not in code
 - **Secret Management**: Critical secrets like JWT keys are required from environment variables with no fallbacks
+- **HTTP Security Headers**: 
+  - Strict-Transport-Security (HSTS): Forces HTTPS connections
+  - Permissions-Policy: Restricts access to sensitive browser features
+  - X-Content-Type-Options: Prevents MIME type sniffing
+  - X-Frame-Options: Prevents clickjacking attacks
+  - Referrer-Policy: Controls how much referrer information is included
+  - X-XSS-Protection: Enables browser's built-in XSS filtering
 
 ## Contributing
 
