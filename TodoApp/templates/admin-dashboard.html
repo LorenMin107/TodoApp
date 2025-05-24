@@ -1,0 +1,287 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">Admin Dashboard</h1>
+        </div>
+    </div>
+
+    <!-- Tabs for different admin functions -->
+    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="users-tab" data-toggle="tab" href="#users" role="tab" aria-controls="users" aria-selected="true">User Management</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="activity-tab" data-toggle="tab" href="#activity" role="tab" aria-controls="activity" aria-selected="false">Activity Monitoring</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="todos-tab" data-toggle="tab" href="#todos" role="tab" aria-controls="todos" aria-selected="false">All Todos</a>
+        </li>
+    </ul>
+
+    <!-- Tab content -->
+    <div class="tab-content" id="adminTabsContent">
+        <!-- User Management Tab -->
+        <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">User Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTableBody">
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.id }}</td>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <select class="form-control role-select" data-user-id="{{ user.id }}" data-user-role="{{ user.role }}">
+                                            <option value="user">User</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        {% if user.is_active %}
+                                        <span class="badge badge-success">
+                                            Active
+                                        </span>
+                                        {% else %}
+                                        <span class="badge badge-danger">
+                                            Inactive
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm {% if user.is_active %}btn-primary{% else %}btn-success{% endif %} toggle-status-btn" data-user-id="{{ user.id }}" data-status="{{ user.is_active|lower }}">
+                                            {% if user.is_active %}Deactivate{% else %}Activate{% endif %}
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Monitoring Tab -->
+        <div class="tab-pane fade" id="activity" role="tabpanel" aria-labelledby="activity-tab">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Activity Monitoring</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activityTableBody">
+                                {% for activity in activities %}
+                                <tr>
+                                    <td>{{ activity.timestamp }}</td>
+                                    <td>{{ activity.username }}</td>
+                                    <td>{{ activity.action }}</td>
+                                    <td>{{ activity.details }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Todos Tab -->
+        <div class="tab-pane fade" id="todos" role="tabpanel" aria-labelledby="todos-tab">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">All Todos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Description</th>
+                                    <th>Priority</th>
+                                    <th>Complete</th>
+                                    <th>Owner</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="todoTableBody">
+                                {% for todo in todos %}
+                                <tr>
+                                    <td>{{ todo.id }}</td>
+                                    <td>{{ todo.title }}</td>
+                                    <td>{{ todo.description }}</td>
+                                    <td>{{ todo.priority }}</td>
+                                    <td>
+                                        {% if todo.complete %}
+                                        <span class="badge badge-success">
+                                            Complete
+                                        </span>
+                                        {% else %}
+                                        <span class="badge badge-warning">
+                                            Incomplete
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ todo.owner_username }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger delete-todo-btn" data-todo-id="{{ todo.id }}">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Function to update user role
+    function updateUserRole(userId, role) {
+        fetch(`/admin/users/${userId}/role`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': window.csrfToken
+            },
+            body: JSON.stringify({ role: role })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to update user role');
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('User role updated successfully');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update user role');
+        });
+    }
+
+    // Function to toggle user status
+    function toggleUserStatus(userId, currentStatus) {
+        fetch(`/admin/users/${userId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': window.csrfToken
+            },
+            body: JSON.stringify({ is_active: !currentStatus })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to update user status');
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('User status updated successfully');
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update user status');
+        });
+    }
+
+    // Function to delete todo
+    function deleteTodo(todoId) {
+        if (confirm('Are you sure you want to delete this todo?')) {
+            fetch(`/admin/todo/${todoId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': window.csrfToken
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to delete todo');
+                }
+                return response;
+            })
+            .then(() => {
+                alert('Todo deleted successfully');
+                location.reload();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete todo');
+            });
+        }
+    }
+
+    // Add event listeners when the DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set initial role selection based on user role
+        document.querySelectorAll('.role-select').forEach(select => {
+            const userRole = select.getAttribute('data-user-role');
+            if (userRole) {
+                // Find the option with the matching value and set it as selected
+                const option = select.querySelector(`option[value="${userRole}"]`);
+                if (option) {
+                    option.selected = true;
+                }
+            }
+
+            // Role select change event
+            select.addEventListener('change', function() {
+                const userId = this.getAttribute('data-user-id');
+                const role = this.value;
+                updateUserRole(userId, role);
+            });
+        });
+
+        // Toggle status button click event
+        document.querySelectorAll('.toggle-status-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const userId = this.getAttribute('data-user-id');
+                const currentStatus = this.getAttribute('data-status') === 'true';
+                toggleUserStatus(userId, currentStatus);
+            });
+        });
+
+        // Delete todo button click event
+        document.querySelectorAll('.delete-todo-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const todoId = this.getAttribute('data-todo-id');
+                deleteTodo(todoId);
+            });
+        });
+    });
+</script>
+{% endblock %}

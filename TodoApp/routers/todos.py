@@ -16,6 +16,7 @@ from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from ..sanitize import sanitize_todo_input
 from ..cache import cached, async_cached, cache_invalidate_pattern
+from ..activity_logger import log_activity
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -220,6 +221,15 @@ async def create_todo(user: user_dependency, db: db_dependency, todo_request: To
     # Invalidate cache for this user's todos
     cache_invalidate_pattern(f"todos:get_all_todos_for_user:{user.get('id')}")
 
+    # Log the activity
+    log_activity(
+        db=db,
+        user_id=user.get('id'),
+        username=user.get('username'),
+        action="create_todo",
+        details=f"Created todo '{sanitized_data['title']}'"
+    )
+
 
 @router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 @require_auth
@@ -244,6 +254,15 @@ async def update_todo(user: user_dependency, db: db_dependency, todo_request: To
     cache_invalidate_pattern(f"todos:get_all_todos_for_user:{user_id}")
     cache_invalidate_pattern(f"todo:get_todo_by_id_and_owner:{todo_id}:{user_id}")
 
+    # Log the activity
+    log_activity(
+        db=db,
+        user_id=user_id,
+        username=user.get('username'),
+        action="update_todo",
+        details=f"Updated todo '{sanitized_data['title']}' (ID: {todo_id})"
+    )
+
 
 @router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 @require_auth
@@ -251,6 +270,9 @@ async def delete_todo(user: user_dependency, db: db_dependency, todo_id: int = P
     todo_model = get_todo_by_id_and_owner(db, todo_id, user.get('id'))
     if todo_model is None:
         raise HTTPException(status_code=404, detail="Todo not found.")
+
+    # Store todo details for logging before deletion
+    todo_title = todo_model.title
 
     # Delete the todo - use the model directly instead of querying again
     db.delete(todo_model)
@@ -260,3 +282,12 @@ async def delete_todo(user: user_dependency, db: db_dependency, todo_id: int = P
     user_id = user.get('id')
     cache_invalidate_pattern(f"todos:get_all_todos_for_user:{user_id}")
     cache_invalidate_pattern(f"todo:get_todo_by_id_and_owner:{todo_id}:{user_id}")
+
+    # Log the activity
+    log_activity(
+        db=db,
+        user_id=user_id,
+        username=user.get('username'),
+        action="delete_todo",
+        details=f"Deleted todo '{todo_title}' (ID: {todo_id})"
+    )

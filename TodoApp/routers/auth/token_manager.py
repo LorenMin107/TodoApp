@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from ...database import SessionLocal
-from ...models import RevokedToken
+from ...models import RevokedToken, Users
 
 # Constants
 SECRET_KEY = os.environ.get('SECRET_KEY')
@@ -296,6 +296,15 @@ async def get_current_user(request: Request, token: Annotated[str, Depends(oauth
         user_role: str = payload.get('role')
         if username is None or user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+        # Check if the user is still active
+        user = db.query(Users).filter(Users.id == user_id).first()
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Your account has been deactivated. Please contact an administrator for assistance."
+            )
+
         return {'username': username, 'id': user_id, 'user_role': user_role}
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
@@ -347,6 +356,11 @@ async def get_current_user_from_cookie(request: Request, access_token: str = Coo
         user_id: int = payload.get('id')
         user_role: str = payload.get('role')
         if username is None or user_id is None:
+            return None
+
+        # Check if the user is still active
+        user = db.query(Users).filter(Users.id == user_id).first()
+        if not user or not user.is_active:
             return None
 
         return {'username': username, 'id': user_id, 'user_role': user_role}

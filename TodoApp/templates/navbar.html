@@ -32,6 +32,15 @@
       </ul>
       <ul class="navbar-nav ml-auto">
         {% if user %}
+        {% if user.user_role == 'admin' %}
+        <li class="nav-item m-1">
+          <a
+            href="/admin/dashboard"
+            class="btn btn-outline-light text-white"
+            >Admin Dashboard</a
+          >
+        </li>
+        {% endif %}
         <li class="nav-item m-1">
           <a
             href="/user/profile"

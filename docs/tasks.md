@@ -91,7 +91,7 @@ This document contains a prioritized list of actionable tasks to improve the Sec
     - Implemented caching for frequently accessed queries with appropriate TTLs
     - Added cache invalidation for all functions that modify data
 
-15. [ ] Implement caching
+15. [x] Implement caching
     - Add Redis or in-memory caching for frequently accessed data
     - Cache static assets with appropriate headers
     - Implement response caching for read-only endpoints
@@ -150,7 +150,7 @@ This document contains a prioritized list of actionable tasks to improve the Sec
     - Implement due dates and reminders
     - Add sharing capabilities for todos
 
-26. [ ] Improve admin functionality
+26. [x] Improve admin functionality
     - Create a proper admin dashboard
     - Add user management features
     - Implement activity monitoring

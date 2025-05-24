@@ -19,6 +19,7 @@ from starlette.responses import RedirectResponse
 from ...models import Users
 from ...totp import setup_totp, verify_totp
 from ...cache import cache_invalidate_pattern
+from ...activity_logger import log_activity
 
 from . import router
 from .token_manager import (
@@ -206,6 +207,15 @@ async def verify_2fa_setup(
     # Invalidate cache for this user
     cache_invalidate_pattern(f"auth:get_user_by_username:{user.username}")
 
+    # Log the 2FA setup activity
+    log_activity(
+        db=db,
+        user_id=user.id,
+        username=user.username,
+        action="enable_2fa",
+        details="User enabled two-factor authentication"
+    )
+
     # Remove the session
     pending_2fa_sessions.pop(session_id, None)
 
@@ -293,6 +303,15 @@ async def verify_2fa(
     # Set authentication cookies
     set_auth_cookies(response, access_token, refresh_token)
 
+    # Log the 2FA verification activity
+    log_activity(
+        db=db,
+        user_id=user.id,
+        username=user.username,
+        action="verify_2fa",
+        details="User completed two-factor authentication"
+    )
+
     # Return success
     return {"message": "Authentication successful"}
 
@@ -340,6 +359,15 @@ async def disable_2fa(
 
     # Invalidate cache for this user
     cache_invalidate_pattern(f"auth:get_user_by_username:{db_user.username}")
+
+    # Log the 2FA disabling activity
+    log_activity(
+        db=db,
+        user_id=user.get('id'),
+        username=user.get('username'),
+        action="disable_2fa",
+        details="User disabled two-factor authentication"
+    )
 
     # Return success
     return {"message": "Two-factor authentication has been disabled successfully"}

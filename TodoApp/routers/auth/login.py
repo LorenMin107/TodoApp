@@ -18,6 +18,7 @@ from ...models import Users
 from ...rate_limiter import check_rate_limit, record_failed_attempt, reset_attempts
 from ...email_utils import generate_verification_token, send_verification_email
 from ...cache import cached, cache_invalidate_pattern
+from ...activity_logger import log_activity
 
 from . import router
 from .token_manager import (
@@ -131,6 +132,9 @@ def authenticate_user(username: str, password: str, db):
         return False
     if not verify_password(password, user.hashed_password):
         return False
+    # Check if the user is active
+    if not user.is_active:
+        return False
     return user
 
 # Routes
@@ -184,6 +188,16 @@ async def login_for_access_token(
     # Check if the request is rate-limited before processing
     # This will raise an HTTPException with status code 429 if rate limited
     check_rate_limit(request, form_data.username)
+
+    # First check if the user exists but is inactive
+    existing_user = get_user_by_username(form_data.username, db)
+    if existing_user and not existing_user.is_active:
+        # Record failed login attempt
+        record_failed_attempt(request, form_data.username)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Your account has been deactivated. Please contact an administrator for assistance."
+        )
 
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
@@ -280,6 +294,15 @@ async def login_for_access_token(
     # Set authentication cookies
     set_auth_cookies(response, access_token, refresh_token)
 
+    # Log the login activity
+    log_activity(
+        db=db,
+        user_id=user.id,
+        username=user.username,
+        action="login",
+        details=f"User logged in successfully"
+    )
+
     return {'access_token': access_token, 'refresh_token': refresh_token, 'token_type': 'bearer'}
 
 @router.post("/refresh-token")
@@ -363,6 +386,14 @@ async def refresh_access_token(
                 detail="Invalid token"
             )
 
+        # Check if the user is still active
+        user = db.query(Users).filter(Users.id == user_id).first()
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Your account has been deactivated. Please contact an administrator for assistance."
+            )
+
         # Get user agent from request
         user_agent = request.headers.get("user-agent", "")
 
@@ -423,6 +454,10 @@ async def logout(
     from .token_manager import SECRET_KEY, ALGORITHM, revoke_token
     from datetime import datetime, timezone
 
+    # Extract user information for logging
+    user_id = None
+    username = None
+
     # Revoke the access token if present
     if access_token:
         try:
@@ -430,6 +465,10 @@ async def logout(
             payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
             jti = payload.get('jti')
             exp = payload.get('exp')
+
+            # Extract user information for logging
+            user_id = payload.get('id')
+            username = payload.get('sub')  # 'sub' contains the username
 
             if jti and exp:
                 # Convert exp to datetime
@@ -461,6 +500,17 @@ async def logout(
     response.delete_cookie(key="access_token", path="/")
     # Clear the refresh_token cookie
     response.delete_cookie(key="refresh_token", path="/auth/")
+
+    # Log the logout activity if we have user information
+    if user_id and username:
+        log_activity(
+            db=db,
+            user_id=user_id,
+            username=username,
+            action="logout",
+            details="User logged out"
+        )
+
     # Return success
     return {"status": "success"}
 

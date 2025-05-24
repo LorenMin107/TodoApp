@@ -10,11 +10,12 @@ load_dotenv()
 
 # Internal modules
 from .models import Base
-from .database import engine
+from .database import engine, SessionLocal
 from .routers.auth import router as auth_router
 from .routers import todos, admin, users
 from .csrf import csrf_middleware
 from .csp import CSPMiddleware
+from .admin_init import initialize_admin_user
 
 app = FastAPI()
 
@@ -24,7 +25,12 @@ app.add_middleware(CSPMiddleware)
 # Add CSRF middleware
 app.middleware("http")(csrf_middleware)
 
+# Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
+
+# Initialize admin user
+with SessionLocal() as db:
+    initialize_admin_user(db)
 
 app.mount("/static", StaticFiles(directory="TodoApp/static"), name="static")
 
