@@ -1,204 +1,178 @@
-# TodoApp Improvement Tasks
+# Improvement Tasks for SecureTodo Application
+
+This document contains a prioritized list of actionable tasks to improve the SecureTodo application. Each task is marked with a checkbox that can be checked off when completed.
 
 ## Security Improvements
 
-1. [x] Move SECRET_KEY to environment variables instead of hardcoding in auth.py
-2. [x] Implement CSRF protection for all forms and API endpoints
-3. [x] Set HttpOnly and Secure flags on JWT cookies
-4. [x] Implement rate limiting for login attempts to prevent brute force attacks
-5. [x] Add password strength requirements (uppercase, lowercase, numbers, special chars)
-6. [x] Implement email verification for new user registrations
-7. [x] Remove sensitive information logging (e.g., token logging in base.js)
-8. [x] Add Content Security Policy headers
-9. [x] Implement proper error handling instead of using bare except blocks
-10. [x] Add input sanitization to prevent XSS attacks
-11. [x] Implement JWT token refresh mechanism
-12. [x] Add session timeout for inactive users
-13. [x] Implement secure password reset functionality
-14. [x] Implement two-factor authentication (2FA)
-15. [ ] Add security headers (X-Content-Type-Options, X-Frame-Options, etc.)
-16. [ ] Implement IP-based access controls for admin endpoints
-17. [ ] Add audit logging for security-sensitive operations
-18. [ ] Implement account lockout after multiple failed attempts
-19. [ ] Add automated security vulnerability scanning
-20. [ ] Implement secure file upload handling
+1. [x] Implement secure password storage with proper key derivation
+   - Review the current bcrypt implementation ✓
+   - Consider adding pepper in addition to salt ✓
+   - Ensure appropriate work factor for bcrypt ✓
+   - Added pepper to password hashing and verification
+   - Set bcrypt work factor to 12 for better security
+   - Updated all password hashing and verification code to use the new implementation
 
-## Database Improvements
+2. [ ] Enhance JWT token security
+   - Add token fingerprinting (include user agent hash in token)
+   - Implement token revocation mechanism
+   - Consider using shorter expiration for access tokens (currently 20 minutes)
 
-1. [x] Configure database connection pooling
-2. [x] Move database credentials to environment variables
-3. [ ] Add indexes for frequently queried fields
-4. [ ] Implement proper database migrations strategy
-5. [ ] Add cascade delete for related records
-6. [ ] Implement soft delete instead of hard delete for data recovery
-7. [ ] Add created_at and updated_at timestamps to all models
-8. [ ] Implement database transaction management for critical operations
-9. [ ] Add database connection retry logic
-10. [ ] Implement database query caching
-11. [ ] Add database schema validation
-12. [ ] Implement database sharding for horizontal scaling
-13. [ ] Add database backup and restore procedures
-14. [ ] Implement data archiving strategy for old records
-15. [ ] Add database performance monitoring
+3. [ ] Improve Content Security Policy
+   - Remove 'unsafe-inline' from script-src and style-src if possible
+   - Implement nonce-based CSP for inline scripts/styles
+   - Add report-uri directive for CSP violation reporting
 
-## Architecture Improvements
+4. [ ] Strengthen input validation
+   - Add server-side validation for all form inputs
+   - Implement strict type checking for API endpoints
+   - Add validation for file uploads if implemented in the future
 
-1. [ ] Implement dependency injection for better testability
-2. [ ] Separate business logic from API endpoints
-3. [ ] Create service layer between controllers and repositories
-4. [ ] Implement repository pattern for database access
-5. [ ] Add proper logging throughout the application
-6. [ ] Implement caching for frequently accessed data
-7. [ ] Create configuration management system
-8. [ ] Implement feature flags for gradual rollout of new features
-9. [ ] Add health check endpoints with detailed system status
-10. [ ] Implement API versioning
-11. [ ] Create modular architecture with clear boundaries
-12. [ ] Implement event-driven architecture for decoupling components
-13. [ ] Add circuit breaker pattern for external service calls
-14. [ ] Implement retry pattern for transient failures
-15. [ ] Create domain-driven design structure
+5. [ ] Enhance rate limiting
+   - Extend rate limiting to all sensitive endpoints (registration, password reset)
+   - Implement progressive delays for repeated failed attempts
+   - Add IP-based rate limiting in addition to username-based
 
-## API Improvements
+6. [ ] Implement security headers
+   - Add Strict-Transport-Security header
+   - Add Permissions-Policy header
+   - Ensure all security headers are properly configured
 
-1. [ ] Add pagination for list endpoints
-2. [ ] Implement filtering and sorting for list endpoints
-3. [ ] Add comprehensive API documentation using OpenAPI/Swagger
-4. [ ] Standardize API response format
-5. [ ] Implement proper HTTP status codes for all responses
-6. [ ] Add request validation for all endpoints
-7. [ ] Implement API rate limiting
-8. [ ] Add support for bulk operations
-9. [ ] Implement proper error responses with error codes
-10. [ ] Add API versioning in URL or header
-11. [ ] Implement HATEOAS for better API discoverability
-12. [ ] Add conditional requests (If-Modified-Since, ETag)
-13. [ ] Implement GraphQL API alongside REST
-14. [ ] Add API analytics and usage metrics
-15. [ ] Create API client libraries for common languages
+7. [ ] Conduct security audit
+   - Perform dependency vulnerability scanning
+   - Conduct manual code review for security issues
+   - Consider automated security scanning tools
 
-## Frontend Improvements
+## Code Organization and Architecture
 
-1. [ ] Add client-side form validation
-2. [ ] Implement confirmation dialogs for destructive actions
-3. [ ] Add loading indicators for asynchronous operations
-4. [ ] Improve accessibility (ARIA attributes, keyboard navigation)
-5. [ ] Implement responsive design for mobile devices
-6. [ ] Add search functionality for todos
-7. [ ] Implement sorting and filtering in the UI
-8. [ ] Add dark mode support
-9. [ ] Improve error messages and user feedback
-10. [ ] Implement progressive web app features
-11. [ ] Add offline support with service workers
-12. [ ] Implement modern frontend framework (React, Vue, etc.)
-13. [ ] Add animations for better user experience
-14. [ ] Implement keyboard shortcuts for power users
-15. [ ] Create component library for consistent UI
+8. [ ] Refactor authentication module
+   - Split auth.py into smaller modules (login, registration, 2FA, password reset)
+   - Create a dedicated token management module
+   - Improve separation of concerns
+
+9. [ ] Implement dependency injection
+   - Create a proper DI container
+   - Remove direct imports of dependencies
+   - Make testing easier with better dependency management
+
+10. [ ] Improve error handling
+    - Create a centralized error handling mechanism
+    - Standardize error responses across the application
+    - Add more detailed logging for errors
+
+11. [ ] Enhance database access layer
+    - Create a repository pattern for database access
+    - Implement proper transaction management
+    - Add database migration scripts for schema changes
+
+12. [ ] Refactor middleware implementation
+    - Create a middleware registry
+    - Improve middleware configuration
+    - Add middleware for request logging
+
+13. [ ] Implement proper configuration management
+    - Create a dedicated config module
+    - Support different environments (dev, test, prod)
+    - Move all configuration to a central location
 
 ## Performance Improvements
 
-1. [ ] Optimize database queries
-2. [ ] Implement lazy loading for large datasets
-3. [ ] Add caching for static assets
-4. [ ] Minify and bundle JavaScript and CSS files
-5. [ ] Implement asynchronous processing for long-running tasks
-6. [ ] Add database query optimization and monitoring
-7. [ ] Implement connection pooling for database connections
-8. [ ] Add performance monitoring and metrics collection
-9. [ ] Implement CDN for static content delivery
-10. [ ] Add image optimization
-11. [ ] Implement server-side rendering for initial page load
-12. [ ] Add HTTP/2 support
-13. [ ] Implement resource hints (preload, prefetch)
-14. [ ] Add compression for API responses
-15. [ ] Implement database read replicas for scaling reads
+14. [ ] Optimize database queries
+    - Add indexes for frequently queried fields
+    - Review and optimize ORM queries
+    - Implement query caching where appropriate
 
-## Testing Improvements
+15. [ ] Implement caching
+    - Add Redis or in-memory caching for frequently accessed data
+    - Cache static assets with appropriate headers
+    - Implement response caching for read-only endpoints
 
-1. [ ] Increase unit test coverage
-2. [ ] Add integration tests for API endpoints
-3. [ ] Implement end-to-end testing
-4. [ ] Add performance testing
-5. [ ] Implement security testing (SAST, DAST)
-6. [ ] Add load testing
-7. [ ] Implement continuous integration pipeline
-8. [ ] Add test data generation tools
-9. [ ] Implement test coverage reporting
-10. [ ] Add mutation testing
-11. [ ] Implement contract testing for API boundaries
-12. [ ] Add visual regression testing
-13. [ ] Implement chaos testing for resilience
-14. [ ] Add accessibility testing
-15. [ ] Implement browser compatibility testing
+16. [ ] Optimize frontend assets
+    - Minify and bundle JavaScript and CSS
+    - Implement lazy loading for non-critical resources
+    - Add proper cache headers for static assets
 
-## User Experience Improvements
+17. [ ] Improve API performance
+    - Implement pagination for list endpoints
+    - Add filtering and sorting capabilities
+    - Consider GraphQL for more efficient data fetching
 
-1. [ ] Add user profile management page
-2. [ ] Implement password reset functionality
-3. [ ] Add account deletion option
-4. [ ] Implement todo categories or tags
-5. [ ] Add due dates for todos
-6. [ ] Implement notifications for upcoming due dates
-7. [ ] Add sharing functionality for todos
-8. [ ] Implement user preferences
-9. [ ] Add multi-language support
-10. [ ] Implement todo templates for recurring tasks
-11. [ ] Add drag-and-drop for todo reordering
-12. [ ] Implement todo priority visualization
-13. [ ] Add todo attachments (files, images)
-14. [ ] Implement todo comments/notes
-15. [ ] Add todo history/activity log
+18. [ ] Enhance session management
+    - Optimize session storage
+    - Implement proper session cleanup
+    - Consider using Redis for session storage
 
-## Code Quality Improvements
+## Testing and Documentation
 
-1. [ ] Implement consistent code formatting
-2. [ ] Add comprehensive docstrings
-3. [ ] Refactor duplicate code
-4. [ ] Implement proper error handling
-5. [ ] Add type hints throughout the codebase
-6. [ ] Implement linting and static code analysis
-7. [ ] Refactor long functions into smaller, more focused functions
-8. [ ] Add meaningful variable and function names
-9. [ ] Remove unused code and dependencies
-10. [ ] Implement proper exception hierarchy
-11. [ ] Add code complexity metrics and limits
-12. [ ] Implement code reviews process
-13. [ ] Add coding standards documentation
-14. [ ] Implement automated code quality checks
-15. [ ] Add architectural decision records (ADRs)
+19. [ ] Improve test coverage
+    - Add more unit tests for all modules
+    - Implement integration tests for critical flows
+    - Add end-to-end tests for key user journeys
 
-## DevOps Improvements
+20. [ ] Enhance API documentation
+    - Add OpenAPI/Swagger documentation
+    - Document all endpoints with examples
+    - Create a developer guide for API usage
 
-1. [ ] Containerize the application using Docker
-2. [ ] Implement infrastructure as code
-3. [ ] Add automated deployment pipeline
-4. [ ] Implement environment-specific configuration
-5. [ ] Add monitoring and alerting
-6. [ ] Implement log aggregation
-7. [ ] Add backup and restore procedures
-8. [ ] Implement disaster recovery plan
-9. [ ] Add horizontal scaling capabilities
-10. [ ] Implement blue-green deployment strategy
-11. [ ] Add canary deployments for risk reduction
-12. [ ] Implement auto-scaling based on load
-13. [ ] Add infrastructure security scanning
-14. [ ] Implement secrets management
-15. [ ] Add cost optimization strategies
+21. [ ] Improve code documentation
+    - Add docstrings to all functions and classes
+    - Create architecture documentation
+    - Document security features and design decisions
 
-## Documentation Improvements
+22. [ ] Implement continuous integration
+    - Set up CI/CD pipeline
+    - Add automated testing in the pipeline
+    - Implement code quality checks (linting, formatting)
 
-1. [ ] Create comprehensive API documentation
-2. [ ] Add user guides and tutorials
-3. [ ] Implement code documentation standards
-4. [ ] Add architecture diagrams
-5. [ ] Create development environment setup guide
-6. [ ] Implement changelog automation
-7. [ ] Add deployment documentation
-8. [ ] Create troubleshooting guides
-9. [ ] Implement documentation versioning
-10. [ ] Add contribution guidelines
-11. [ ] Create security policy documentation
-12. [ ] Implement automated documentation generation
-13. [ ] Add performance benchmarks documentation
-14. [ ] Create database schema documentation
-15. [ ] Implement API examples and use cases
+23. [ ] Create user documentation
+    - Write user guides for all features
+    - Add in-app help and tooltips
+    - Create FAQ and troubleshooting guides
+
+## Feature Enhancements
+
+24. [ ] Implement user profile enhancements
+    - Add profile pictures
+    - Implement user preferences
+    - Add account activity logging
+
+25. [ ] Enhance todo management
+    - Add categories/tags for todos
+    - Implement due dates and reminders
+    - Add sharing capabilities for todos
+
+26. [ ] Improve admin functionality
+    - Create a proper admin dashboard
+    - Add user management features
+    - Implement activity monitoring
+
+27. [ ] Add analytics and reporting
+    - Implement basic analytics for user activity
+    - Add reporting features for admins
+    - Create data export capabilities
+
+28. [ ] Enhance mobile experience
+    - Improve responsive design
+    - Consider developing a mobile app
+    - Implement offline capabilities
+
+## Deployment and Operations
+
+29. [ ] Improve deployment process
+    - Create Docker containers for the application
+    - Implement infrastructure as code
+    - Add deployment automation
+
+30. [ ] Enhance monitoring and logging
+    - Implement centralized logging
+    - Add performance monitoring
+    - Set up alerts for critical issues
+
+31. [ ] Implement backup and recovery
+    - Create automated backup procedures
+    - Test recovery processes
+    - Document disaster recovery plans
+
+32. [ ] Prepare for scaling
+    - Identify potential bottlenecks
+    - Design for horizontal scaling
+    - Implement load balancing

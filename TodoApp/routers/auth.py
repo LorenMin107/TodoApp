@@ -34,7 +34,50 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not set. Please set it in the .env file.")
 ALGORITHM = os.environ.get('ALGORITHM', 'HS256')
 
-bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Get password pepper from environment or generate a secure one if not set
+# The pepper adds an additional layer of security beyond the salt that bcrypt already uses
+PASSWORD_PEPPER = os.environ.get('PASSWORD_PEPPER')
+if not PASSWORD_PEPPER:
+    # Generate a secure pepper and log a warning that it's not set in environment
+    PASSWORD_PEPPER = secrets.token_hex(16)
+    print("WARNING: PASSWORD_PEPPER environment variable is not set. Using a generated value.")
+    print("For production, set a permanent PASSWORD_PEPPER in your .env file.")
+
+# Set a higher work factor (12) for better security
+# The work factor determines how computationally intensive the hashing will be
+# Higher values are more secure but take longer to compute
+bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+
+# Helper functions for password hashing and verification with pepper
+def hash_password(password: str) -> str:
+    """
+    Hash a password with bcrypt, adding a pepper before hashing.
+    The pepper is a server-side secret that adds an additional layer of security.
+
+    Args:
+        password: The plaintext password to hash
+
+    Returns:
+        The hashed password
+    """
+    # Combine the password with the pepper before hashing
+    peppered_password = f"{password}{PASSWORD_PEPPER}"
+    return bcrypt_context.hash(peppered_password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verify a password against a hashed password, adding the pepper before verification.
+
+    Args:
+        plain_password: The plaintext password to verify
+        hashed_password: The hashed password to verify against
+
+    Returns:
+        True if the password matches, False otherwise
+    """
+    # Combine the password with the pepper before verification
+    peppered_password = f"{plain_password}{PASSWORD_PEPPER}"
+    return bcrypt_context.verify(peppered_password, hashed_password)
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 # Store pending 2FA sessions
@@ -564,7 +607,7 @@ async def reset_password(token: str, password_reset: PasswordReset, db: db_depen
         )
 
     # Update the user's password
-    user.hashed_password = bcrypt_context.hash(password_reset.password)
+    user.hashed_password = hash_password(password_reset.password)
 
     # Clear the reset token
     user.password_reset_token = None
@@ -583,7 +626,7 @@ def authenticate_user(username: str, password: str, db):
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
         return False
-    if not bcrypt_context.verify(password, user.hashed_password):
+    if not verify_password(password, user.hashed_password):
         return False
     return user
 
@@ -702,7 +745,7 @@ async def create_user(
         first_name=sanitized_data['first_name'],
         last_name=sanitized_data['last_name'],
         role='user',  # Set a fixed role of 'user' for all new registrations
-        hashed_password=bcrypt_context.hash(create_user_request.password),
+        hashed_password=hash_password(create_user_request.password),
         is_active=True,
         phone_number=sanitized_data['phone_number'],
         email_verified=False,

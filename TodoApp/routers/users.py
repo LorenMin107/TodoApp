@@ -7,9 +7,8 @@ from starlette import status
 from starlette.responses import RedirectResponse
 from ..models import Users
 from ..database import SessionLocal
-from .auth import get_current_user_from_cookie
+from .auth import get_current_user_from_cookie, verify_password, hash_password
 from ..password_validator import validate_password
-from passlib.context import CryptContext
 from ..sanitize import sanitize_html
 from fastapi.templating import Jinja2Templates
 
@@ -33,7 +32,6 @@ def get_db():
 # This is the dependency that will be used to get the database session
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user_from_cookie)]
-bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class UserVerification(BaseModel):
@@ -54,7 +52,7 @@ async def change_password(user: user_dependency, db: db_dependency, user_verific
         raise HTTPException(status_code=401, detail="User not authenticated.")
     user_model = db.query(Users).filter(Users.id == user.get('id')).first()
 
-    if not bcrypt_context.verify(user_verification.password, user_model.hashed_password):
+    if not verify_password(user_verification.password, user_model.hashed_password):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
 
     # Validate new password strength
@@ -65,7 +63,7 @@ async def change_password(user: user_dependency, db: db_dependency, user_verific
             detail=error_message
         )
 
-    user_model.hashed_password = bcrypt_context.hash(user_verification.new_password)
+    user_model.hashed_password = hash_password(user_verification.new_password)
     db.add(user_model)
     db.commit()
 
