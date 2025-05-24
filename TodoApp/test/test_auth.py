@@ -1,9 +1,11 @@
 from .utils import *
-from ..routers.auth import get_db, authenticate_user, create_access_token, SECRET_KEY, ALGORITHM, get_current_user
+from ..routers.auth.token_manager import get_db, SECRET_KEY, ALGORITHM, get_current_user, create_access_token
+from ..routers.auth.login import authenticate_user
 from jose import jwt
 from datetime import timedelta
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
+from unittest.mock import MagicMock
 
 app.dependency_overrides[get_db] = override_get_db
 
@@ -28,7 +30,7 @@ def test_create_access_token():
     role = 'user'
     expires_delta = timedelta(days=1)
 
-    token = create_access_token(username, user_id, role, expires_delta)
+    token, jti, expires = create_access_token(username, user_id, role, expires_delta)
     decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
 
     assert decoded_token['sub'] == username
@@ -38,10 +40,18 @@ def test_create_access_token():
 
 @pytest.mark.asyncio
 async def test_get_current_user_valid_token():
-    encode = {'sub': 'lorenmin', 'id': 1, 'role': 'admin'}
+    encode = {'sub': 'lorenmin', 'id': 1, 'role': 'admin', 'jti': '12345'}
     token = jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
-    user = await get_current_user(token=token)
+    # Create a mock request object
+    mock_request = MagicMock(spec=Request)
+    mock_request.headers = {"user-agent": "test-user-agent"}
+
+    # Create a mock db session that returns None for is_token_revoked
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    user = await get_current_user(request=mock_request, token=token, db=mock_db)
     assert user == {'username': 'lorenmin', 'id': 1, 'user_role': 'admin'}
 
 
@@ -50,8 +60,15 @@ async def test_get_current_user_missing_payload():
     encode = {'role': 'user'}
     token = jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
+    # Create a mock request object
+    mock_request = MagicMock(spec=Request)
+    mock_request.headers = {"user-agent": "test-user-agent"}
+
+    # Create a mock db session
+    mock_db = MagicMock()
+
     with pytest.raises(HTTPException) as excinfo:
-        await get_current_user(token=token)
+        await get_current_user(request=mock_request, token=token, db=mock_db)
 
     assert excinfo.value.status_code == 401
     assert excinfo.value.detail == 'Invalid token'

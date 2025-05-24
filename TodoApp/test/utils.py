@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import pytest
 from ..main import app
 from ..models import Todos, Users
-from ..routers.auth import bcrypt_context
+from ..routers.auth.token_manager import bcrypt_context
 
 SQLALCHEMY_DATABASE_URI = 'sqlite:///./testdb.db'
 

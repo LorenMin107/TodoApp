@@ -11,7 +11,8 @@ load_dotenv()
 # Internal modules
 from .models import Base
 from .database import engine
-from .routers import auth, todos, admin, users
+from .routers.auth import router as auth_router
+from .routers import todos, admin, users
 from .csrf import csrf_middleware
 from .csp import CSPMiddleware
 
@@ -37,7 +38,8 @@ async def root(request: Request, access_token: Optional[str] = Cookie(None)):
     # Try to validate the token
     try:
         # Import here to avoid circular imports
-        from .routers.auth import SECRET_KEY, ALGORITHM, jwt
+        from .routers.auth.token_manager import SECRET_KEY, ALGORITHM
+        from jose import jwt
 
         # Decode the JWT token
         jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -55,7 +57,7 @@ def health_check():
     return {"status": "healthy"}
 
 
-app.include_router(auth.router)
+app.include_router(auth_router)
 app.include_router(todos.router)
 app.include_router(admin.router)
 app.include_router(users.router)

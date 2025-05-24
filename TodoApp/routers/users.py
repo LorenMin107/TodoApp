@@ -7,7 +7,7 @@ from starlette import status
 from starlette.responses import RedirectResponse
 from ..models import Users
 from ..database import SessionLocal
-from .auth import get_current_user_from_cookie, verify_password, hash_password
+from .auth.token_manager import get_current_user_from_cookie, verify_password, hash_password
 from ..password_validator import validate_password
 from ..sanitize import sanitize_html
 from fastapi.templating import Jinja2Templates

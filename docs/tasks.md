@@ -47,10 +47,13 @@ This document contains a prioritized list of actionable tasks to improve the Sec
 
 ## Code Organization and Architecture
 
-8. [ ] Refactor authentication module
-   - Split auth.py into smaller modules (login, registration, 2FA, password reset)
-   - Create a dedicated token management module
-   - Improve separation of concerns
+8. [x] Refactor authentication module
+   - Split auth.py into smaller modules (login, registration, 2FA, password reset) ✓
+   - Create a dedicated token management module ✓
+   - Improve separation of concerns ✓
+   - Created auth package with dedicated modules for each component
+   - Moved token management to its own module
+   - Updated imports in all affected files
 
 9. [ ] Implement dependency injection
    - Create a proper DI container

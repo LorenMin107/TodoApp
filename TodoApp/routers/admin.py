@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, Path, APIRouter
 from starlette import status
 from ..models import Todos
 from ..database import SessionLocal
-from .auth import get_current_user_from_cookie
+from .auth.token_manager import get_current_user_from_cookie
 
 router = APIRouter(
     prefix="/admin",
