@@ -12,10 +12,13 @@ This document contains a prioritized list of actionable tasks to improve the Sec
    - Set bcrypt work factor to 12 for better security
    - Updated all password hashing and verification code to use the new implementation
 
-2. [ ] Enhance JWT token security
-   - Add token fingerprinting (include user agent hash in token)
-   - Implement token revocation mechanism
-   - Consider using shorter expiration for access tokens (currently 20 minutes)
+2. [x] Enhance JWT token security
+   - Add token fingerprinting (include user agent hash in token) ✓
+   - Implement token revocation mechanism ✓
+   - Consider using shorter expiration for access tokens (currently 20 minutes) ✓
+   - Added user agent fingerprinting to tokens for enhanced security
+   - Implemented token revocation mechanism with database tracking
+   - Reduced access token expiration from 20 minutes to 10 minutes
 
 3. [ ] Improve Content Security Policy
    - Remove 'unsafe-inline' from script-src and style-src if possible

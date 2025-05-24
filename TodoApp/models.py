@@ -2,6 +2,15 @@ from .database import Base
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 
 
+class RevokedToken(Base):
+    __tablename__ = 'revoked_tokens'
+
+    id = Column(Integer, primary_key=True, index=True)
+    jti = Column(String, unique=True, index=True)  # JWT ID (unique identifier for the token)
+    revoked_at = Column(DateTime)
+    expires_at = Column(DateTime)  # When the token would have expired
+
+
 class Users(Base):
     __tablename__ = 'users'
 

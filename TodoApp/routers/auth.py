@@ -2,6 +2,8 @@ from datetime import timedelta, datetime, timezone
 import os
 import secrets
 import requests
+import hashlib
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Cookie, Form
 from pydantic import BaseModel
@@ -12,7 +14,7 @@ from starlette import status
 from starlette.responses import RedirectResponse
 
 from ..database import SessionLocal
-from ..models import Users
+from ..models import Users, RevokedToken
 from ..rate_limiter import check_rate_limit, record_failed_attempt, reset_attempts
 from ..password_validator import validate_password
 from ..email_utils import generate_verification_token, send_verification_email, generate_password_reset_token, \
@@ -186,22 +188,44 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 
-async def get_current_user_from_cookie(access_token: str = Cookie(None)):
+async def get_current_user_from_cookie(request: Request, access_token: str = Cookie(None), db: Session = Depends(get_db)):
     if access_token is None:
         return None
 
     try:
         payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+
         # Verify this is an access token
         token_type = payload.get('token_type')
         if token_type != 'access':
             return None
+
+        # Get token identifier
+        jti = payload.get('jti')
+        if jti is None:
+            return None
+
+        # Check if token is revoked
+        if is_token_revoked(jti, db):
+            return None
+
+        # Verify user agent fingerprint if present in token
+        token_fingerprint = payload.get('fgp')
+        if token_fingerprint:
+            # Get user agent from request
+            user_agent = request.headers.get("user-agent", "")
+            # Hash the current user agent
+            current_fingerprint = hash_user_agent(user_agent)
+            # Compare fingerprints
+            if token_fingerprint != current_fingerprint:
+                return None
 
         username: str = payload.get('sub')
         user_id: int = payload.get('id')
         user_role: str = payload.get('role')
         if username is None or user_id is None:
             return None
+
         return {'username': username, 'id': user_id, 'user_role': user_role}
     except JWTError:
         return None
@@ -245,7 +269,42 @@ def render_register_page(request: Request):
 
 
 @router.get("/logout")
-def logout(response: Response):
+async def logout(request: Request, response: Response, db: Session = Depends(get_db), 
+                access_token: str = Cookie(None), refresh_token: str = Cookie(None)):
+    # Revoke the access token if present
+    if access_token:
+        try:
+            # Decode the token to get the jti and expiration
+            payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+            jti = payload.get('jti')
+            exp = payload.get('exp')
+
+            if jti and exp:
+                # Convert exp to datetime
+                expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+                # Revoke the token
+                revoke_token(jti, expires_at, db)
+        except JWTError:
+            # If the token is invalid, just continue with logout
+            pass
+
+    # Revoke the refresh token if present
+    if refresh_token:
+        try:
+            # Decode the token to get the jti and expiration
+            payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+            jti = payload.get('jti')
+            exp = payload.get('exp')
+
+            if jti and exp:
+                # Convert exp to datetime
+                expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+                # Revoke the token
+                revoke_token(jti, expires_at, db)
+        except JWTError:
+            # If the token is invalid, just continue with logout
+            pass
+
     # Clear the access_token cookie
     response.delete_cookie(key="access_token", path="/")
     # Clear the refresh_token cookie
@@ -438,7 +497,8 @@ async def verify_2fa_setup(
 
 @router.post("/verify-2fa")
 async def verify_2fa(
-        request: TOTPVerifyRequest,
+        totp_request: TOTPVerifyRequest,
+        request: Request,
         response: Response,
         db: Session = Depends(get_db),
         session_id: str = Cookie(None, alias="2fa_session")
@@ -470,7 +530,7 @@ async def verify_2fa(
         )
 
     # Verify the TOTP code
-    if not verify_totp(user.totp_secret, request.token):
+    if not verify_totp(user.totp_secret, totp_request.token):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification code"
@@ -479,11 +539,26 @@ async def verify_2fa(
     # Remove the session
     pending_2fa_sessions.pop(session_id, None)
 
-    # Create an access token (short-lived, 20 minutes)
-    access_token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
+    # Get user agent from request
+    user_agent = request.headers.get("user-agent", "")
+
+    # Create an access token (short-lived, 10 minutes)
+    access_token, access_jti, access_exp = create_access_token(
+        user.username, 
+        user.id, 
+        user.role, 
+        timedelta(minutes=10),  # Reduced from 20 minutes to 10 minutes
+        user_agent
+    )
 
     # Create a refresh token (long-lived, 7 days)
-    refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
+    refresh_token, refresh_jti, refresh_exp = create_refresh_token(
+        user.username, 
+        user.id, 
+        user.role, 
+        timedelta(days=7),
+        user_agent
+    )
 
     # Set authentication cookies
     set_auth_cookies(response, access_token, refresh_token)
@@ -631,19 +706,129 @@ def authenticate_user(username: str, password: str, db):
     return user
 
 
-def create_token(username: str, user_id: int, role: str, expires_delta: timedelta, token_type: str = 'access'):
-    encode = {'sub': username, 'id': user_id, 'role': role, 'token_type': token_type}
+def hash_user_agent(user_agent: str) -> str:
+    """
+    Create a hash of the user agent string to use for token fingerprinting.
+
+    Args:
+        user_agent: The user agent string from the request headers
+
+    Returns:
+        A hash of the user agent string
+    """
+    if not user_agent:
+        return "unknown"
+
+    # Create a SHA-256 hash of the user agent
+    return hashlib.sha256(user_agent.encode()).hexdigest()
+
+
+def create_token(username: str, user_id: int, role: str, expires_delta: timedelta, token_type: str = 'access', user_agent: str = None):
+    # Generate a unique token ID (jti)
+    jti = str(uuid.uuid4())
+
+    # Create the token payload
+    encode = {
+        'sub': username,
+        'id': user_id,
+        'role': role,
+        'token_type': token_type,
+        'jti': jti  # Include the unique token ID
+    }
+
+    # Add user agent fingerprint if provided
+    if user_agent:
+        encode['fgp'] = hash_user_agent(user_agent)
+
+    # Set expiration time
     expires = datetime.now(timezone.utc) + expires_delta
     encode.update({'exp': expires})
-    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM), jti, expires
 
 
-def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    return create_token(username, user_id, role, expires_delta, 'access')
+def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta, user_agent: str = None):
+    """
+    Create an access token with the given parameters.
+
+    Args:
+        username: The username of the user
+        user_id: The ID of the user
+        role: The role of the user
+        expires_delta: How long the token should be valid for
+        user_agent: The user agent string from the request headers
+
+    Returns:
+        A tuple containing the token, the jti, and the expiration time
+    """
+    return create_token(username, user_id, role, expires_delta, 'access', user_agent)
 
 
-def create_refresh_token(username: str, user_id: int, role: str, expires_delta: timedelta):
-    return create_token(username, user_id, role, expires_delta, 'refresh')
+def create_refresh_token(username: str, user_id: int, role: str, expires_delta: timedelta, user_agent: str = None):
+    """
+    Create a refresh token with the given parameters.
+
+    Args:
+        username: The username of the user
+        user_id: The ID of the user
+        role: The role of the user
+        expires_delta: How long the token should be valid for
+        user_agent: The user agent string from the request headers
+
+    Returns:
+        A tuple containing the token, the jti, and the expiration time
+    """
+    return create_token(username, user_id, role, expires_delta, 'refresh', user_agent)
+
+
+def is_token_revoked(jti: str, db: Session) -> bool:
+    """
+    Check if a token is revoked.
+
+    Args:
+        jti: The unique identifier of the token
+        db: The database session
+
+    Returns:
+        True if the token is revoked, False otherwise
+    """
+    revoked_token = db.query(RevokedToken).filter(RevokedToken.jti == jti).first()
+    return revoked_token is not None
+
+
+def revoke_token(jti: str, expires_at: datetime, db: Session) -> None:
+    """
+    Revoke a token by adding it to the revoked tokens table.
+
+    Args:
+        jti: The unique identifier of the token
+        expires_at: When the token would have expired
+        db: The database session
+    """
+    revoked_token = RevokedToken(
+        jti=jti,
+        revoked_at=datetime.now(timezone.utc),
+        expires_at=expires_at
+    )
+    db.add(revoked_token)
+    db.commit()
+
+    # Clean up expired tokens occasionally (1 in 10 chance)
+    if secrets.randbelow(10) == 0:
+        cleanup_expired_tokens(db)
+
+
+def cleanup_expired_tokens(db: Session) -> None:
+    """
+    Remove expired tokens from the revoked tokens table.
+    This helps prevent the database from growing too large.
+
+    Args:
+        db: The database session
+    """
+    current_time = datetime.now(timezone.utc)
+    db.query(RevokedToken).filter(RevokedToken.expires_at < current_time).delete()
+    db.commit()
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
@@ -654,7 +839,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         httponly=True,  # Prevents JavaScript access
         secure=True,  # Only sent over HTTPS
         samesite="strict",  # Prevents CSRF attacks
-        max_age=1200,  # 20 minutes in seconds
+        max_age=600,  # 10 minutes in seconds (reduced from 20 minutes)
         path="/"  # Available across the entire domain
     )
 
@@ -670,9 +855,33 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
     )
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
+async def get_current_user(request: Request, token: Annotated[str, Depends(oauth2_bearer)], db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # Decode the JWT token
+
+        # Get token identifier
+        jti = payload.get('jti')
+        if jti is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+        # Check if token is revoked
+        if is_token_revoked(jti, db):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
+
+        # Verify user agent fingerprint if present in token
+        token_fingerprint = payload.get('fgp')
+        if token_fingerprint:
+            # Get user agent from request
+            user_agent = request.headers.get("user-agent", "")
+            # Hash the current user agent
+            current_fingerprint = hash_user_agent(user_agent)
+            # Compare fingerprints
+            if token_fingerprint != current_fingerprint:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Token was issued for a different device or browser"
+                )
+
         username: str = payload.get('sub')  # sub is the subject of the token
         user_id: int = payload.get('id')
         user_role: str = payload.get('role')
@@ -767,7 +976,7 @@ async def create_user(
 
 
 @router.post("/refresh-token", response_model=Token)
-async def refresh_access_token(response: Response, refresh_token: str = Cookie(None)):
+async def refresh_access_token(request: Request, response: Response, db: Session = Depends(get_db), refresh_token: str = Cookie(None)):
     if refresh_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -786,6 +995,35 @@ async def refresh_access_token(response: Response, refresh_token: str = Cookie(N
                 detail="Invalid token type"
             )
 
+        # Get token identifier
+        jti = payload.get('jti')
+        if jti is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+
+        # Check if token is revoked
+        if is_token_revoked(jti, db):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked"
+            )
+
+        # Verify user agent fingerprint if present in token
+        token_fingerprint = payload.get('fgp')
+        if token_fingerprint:
+            # Get user agent from request
+            user_agent = request.headers.get("user-agent", "")
+            # Hash the current user agent
+            current_fingerprint = hash_user_agent(user_agent)
+            # Compare fingerprints
+            if token_fingerprint != current_fingerprint:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Token was issued for a different device or browser"
+                )
+
         # Extract user information from the refresh token
         username: str = payload.get('sub')
         user_id: int = payload.get('id')
@@ -797,12 +1035,16 @@ async def refresh_access_token(response: Response, refresh_token: str = Cookie(N
                 detail="Invalid token"
             )
 
+        # Get user agent from request
+        user_agent = request.headers.get("user-agent", "")
+
         # Create a new access token
-        new_access_token = create_access_token(
+        new_access_token, new_access_jti, new_access_exp = create_access_token(
             username=username,
             user_id=user_id,
             role=user_role,
-            expires_delta=timedelta(minutes=20)
+            expires_delta=timedelta(minutes=10),  # Reduced from 20 minutes to 10 minutes
+            user_agent=user_agent
         )
 
         # Set the new access token as a cookie (reuse the existing refresh token)
@@ -812,7 +1054,7 @@ async def refresh_access_token(response: Response, refresh_token: str = Cookie(N
             httponly=True,
             secure=True,
             samesite="strict",
-            max_age=1200,  # 20 minutes in seconds
+            max_age=600,  # 10 minutes in seconds (reduced from 20 minutes)
             path="/"
         )
 
@@ -918,11 +1160,26 @@ async def login_for_access_token(
         }
 
     # If 2FA is not enabled, proceed with normal login
-    # Create access token (short-lived, 20 minutes)
-    access_token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20))
+    # Get user agent from request
+    user_agent = request.headers.get("user-agent", "")
+
+    # Create access token (short-lived, 10 minutes)
+    access_token, access_jti, access_exp = create_access_token(
+        user.username, 
+        user.id, 
+        user.role, 
+        timedelta(minutes=10),  # Reduced from 20 minutes to 10 minutes
+        user_agent
+    )
 
     # Create a refresh token (long-lived, 7 days)
-    refresh_token = create_refresh_token(user.username, user.id, user.role, timedelta(days=7))
+    refresh_token, refresh_jti, refresh_exp = create_refresh_token(
+        user.username, 
+        user.id, 
+        user.role, 
+        timedelta(days=7),
+        user_agent
+    )
 
     # Set authentication cookies
     set_auth_cookies(response, access_token, refresh_token)
