@@ -5,19 +5,15 @@ This module provides functionality for user authentication and login.
 """
 
 import requests
-from datetime import timedelta
-from typing import Optional, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, Form, Cookie
+from fastapi import Depends, HTTPException, Request, Response, Form, Cookie
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Annotated
 
 from starlette import status
-from starlette.responses import RedirectResponse
 
-from ...database import SessionLocal
 from ...models import Users
 from ...rate_limiter import check_rate_limit, record_failed_attempt, reset_attempts
 from ...email_utils import generate_verification_token, send_verification_email

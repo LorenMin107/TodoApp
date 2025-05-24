@@ -7,14 +7,12 @@ the reset token, and setting a new password.
 
 from datetime import datetime
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import RedirectResponse
 
-from ...database import SessionLocal
 from ...models import Users
 from ...password_validator import validate_password
 from ...email_utils import generate_password_reset_token, send_password_reset_email

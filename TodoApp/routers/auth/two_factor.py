@@ -7,7 +7,7 @@ two-factor authentication.
 
 import secrets
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Tuple, Optional
+from typing import Tuple, Optional
 
 from fastapi import Depends, HTTPException, Request, Response, Cookie
 from fastapi.templating import Jinja2Templates
@@ -16,13 +16,12 @@ from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import RedirectResponse
 
-from ...database import SessionLocal
 from ...models import Users
 from ...totp import setup_totp, verify_totp
 
 from . import router
 from .token_manager import (
-    get_db, db_dependency, create_access_token, create_refresh_token,
+    get_db, create_access_token, create_refresh_token,
     set_auth_cookies, get_current_user_from_cookie, pending_2fa_sessions
 )
 
@@ -266,7 +265,7 @@ async def verify_2fa(
     # Remove the session
     pending_2fa_sessions.pop(session_id, None)
 
-    # Get user agent from request
+    # Get a user agent from request
     user_agent = request.headers.get("user-agent", "")
 
     # Create an access token (short-lived, 10 minutes)

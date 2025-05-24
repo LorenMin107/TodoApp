@@ -4,19 +4,13 @@ Registration module for the TodoApp application.
 This module provides functionality for user registration and email verification.
 """
 
-import requests
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from typing import Annotated
 
 from starlette import status
 from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from ...database import SessionLocal
 from ...models import Users
 from ...password_validator import validate_password
 from ...email_utils import generate_verification_token, send_verification_email

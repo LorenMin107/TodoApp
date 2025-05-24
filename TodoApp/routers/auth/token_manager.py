@@ -10,7 +10,7 @@ import secrets
 import hashlib
 import uuid
 from datetime import timedelta, datetime, timezone
-from typing import Tuple, Optional, Annotated, Dict
+from typing import Annotated, Dict
 
 from fastapi import Depends, HTTPException, Request, Cookie
 from fastapi.security import OAuth2PasswordBearer
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from ...database import SessionLocal
-from ...models import RevokedToken, Users
+from ...models import RevokedToken
 
 # Constants
 SECRET_KEY = os.environ.get('SECRET_KEY')
@@ -28,11 +28,11 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not set. Please set it in the .env file.")
 ALGORITHM = os.environ.get('ALGORITHM', 'HS256')
 
-# Get password pepper from environment or generate a secure one if not set
-# The pepper adds an additional layer of security beyond the salt that bcrypt already uses
+# Get password pepper from the environment or generate a secure one if not set
+# The pepper adds another layer of security beyond the salt that bcrypt already uses
 PASSWORD_PEPPER = os.environ.get('PASSWORD_PEPPER')
 if not PASSWORD_PEPPER:
-    # Generate a secure pepper and log a warning that it's not set in environment
+    # Generate a secure pepper and log a warning that it's not set in the environment
     PASSWORD_PEPPER = secrets.token_hex(16)
     print("WARNING: PASSWORD_PEPPER environment variable is not set. Using a generated value.")
     print("For production, set a permanent PASSWORD_PEPPER in your .env file.")
@@ -60,7 +60,7 @@ db_dependency = Annotated[Session, Depends(get_db)]
 def hash_password(password: str) -> str:
     """
     Hash a password with bcrypt, adding a pepper before hashing.
-    The pepper is a server-side secret that adds an additional layer of security.
+    The pepper is a server-side secret that adds another layer of security.
 
     Args:
         password: The plaintext password to hash
@@ -92,7 +92,7 @@ def hash_user_agent(user_agent: str) -> str:
     Create a hash of the user agent string to use for token fingerprinting.
 
     Args:
-        user_agent: The user agent string from the request headers
+        user_agent: The user agent strings from the request headers
 
     Returns:
         A hash of the user agent string
@@ -100,7 +100,7 @@ def hash_user_agent(user_agent: str) -> str:
     if not user_agent:
         return "unknown"
 
-    # Create a SHA-256 hash of the user agent
+    # Create an SHA-256 hash of the user agent
     return hashlib.sha256(user_agent.encode()).hexdigest()
 
 def create_token(username: str, user_id: int, role: str, expires_delta: timedelta, token_type: str = 'access', user_agent: str = None):
@@ -273,14 +273,14 @@ async def get_current_user(request: Request, token: Annotated[str, Depends(oauth
         if jti is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-        # Check if token is revoked
+        # Check if the token is revoked
         if is_token_revoked(jti, db):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
 
         # Verify user agent fingerprint if present in token
         token_fingerprint = payload.get('fgp')
         if token_fingerprint:
-            # Get user agent from request
+            # Get a user agent from request
             user_agent = request.headers.get("user-agent", "")
             # Hash the current user agent
             current_fingerprint = hash_user_agent(user_agent)
@@ -328,14 +328,14 @@ async def get_current_user_from_cookie(request: Request, access_token: str = Coo
         if jti is None:
             return None
 
-        # Check if token is revoked
+        # Check if the token is revoked
         if is_token_revoked(jti, db):
             return None
 
         # Verify user agent fingerprint if present in token
         token_fingerprint = payload.get('fgp')
         if token_fingerprint:
-            # Get user agent from request
+            # Get a user agent from request
             user_agent = request.headers.get("user-agent", "")
             # Hash the current user agent
             current_fingerprint = hash_user_agent(user_agent)
