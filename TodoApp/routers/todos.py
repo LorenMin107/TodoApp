@@ -1,4 +1,4 @@
-from typing import Annotated, Callable, TypeVar, Any
+from typing import Annotated, Callable, TypeVar, Any, List
 import logging
 import functools
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,6 +15,7 @@ from .auth.two_factor import check_pending_2fa_session
 from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from ..sanitize import sanitize_todo_input
+from ..cache import cached, async_cached, cache_invalidate_pattern
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -131,25 +132,63 @@ async def render_add_todo_page(request: Request, user: user_dependency = None):
 @handle_exceptions
 @require_auth
 async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependency, user: user_dependency = None):
-    todo = get_todo_by_id(db, todo_id)
+    # Use get_todo_by_id_and_owner to ensure the user can only edit their own todos
+    todo = get_todo_by_id_and_owner(db, todo_id, user.get('id'))
     if todo is None:
-        logger.warning(f"Todo with id {todo_id} not found")
+        logger.warning(f"Todo with id {todo_id} not found or does not belong to user {user.get('id')}")
         return RedirectResponse(url="/todos/todo-page", status_code=status.HTTP_302_FOUND)
 
     return templates.TemplateResponse("edit-todo.html", {"request": request, "todo": todo, "user": user})
 
 
 ### Database query utility functions ###
-def get_all_todos_for_user(db: Session, user_id: int) -> list[Todos]:
+@cached(key_prefix="todos", ttl=60)  # Cache for 1 minute
+def get_all_todos_for_user(db: Session, user_id: int) -> List[Todos]:
+    """
+    Get all todos for a user.
+
+    Args:
+        db: The database session
+        user_id: The ID of the user
+
+    Returns:
+        A list of todos belonging to the user
+    """
     return db.query(Todos).filter(Todos.owner_id == user_id).all()
 
 
-def get_todo_by_id(db: Session, todo_id: int) -> Todos:
-    return db.query(Todos).filter(Todos.id == todo_id).first()
-
-
+@cached(key_prefix="todo", ttl=60)  # Cache for 1 minute
 def get_todo_by_id_and_owner(db: Session, todo_id: int, owner_id: int) -> Todos:
+    """
+    Get a todo by ID and owner ID.
+
+    Args:
+        db: The database session
+        todo_id: The ID of the todo
+        owner_id: The ID of the owner
+
+    Returns:
+        The todo if found, None otherwise
+    """
     return db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == owner_id).first()
+
+
+# This function should only be used in admin contexts or when owner verification is done separately
+def get_todo_by_id(db: Session, todo_id: int) -> Todos:
+    """
+    Get a todo by ID without checking ownership.
+
+    WARNING: This function should only be used in admin contexts or when owner verification
+    is done separately to avoid security issues.
+
+    Args:
+        db: The database session
+        todo_id: The ID of the todo
+
+    Returns:
+        The todo if found, None otherwise
+    """
+    return db.query(Todos).filter(Todos.id == todo_id).first()
 
 
 ### Endpoints for rendering pages ####
@@ -178,6 +217,9 @@ async def create_todo(user: user_dependency, db: db_dependency, todo_request: To
     db.add(todo_model)
     db.commit()
 
+    # Invalidate cache for this user's todos
+    cache_invalidate_pattern(f"todos:get_all_todos_for_user:{user.get('id')}")
+
 
 @router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 @require_auth
@@ -197,6 +239,11 @@ async def update_todo(user: user_dependency, db: db_dependency, todo_request: To
     db.add(todo_model)
     db.commit()
 
+    # Invalidate cache for this user's todos and this specific todo
+    user_id = user.get('id')
+    cache_invalidate_pattern(f"todos:get_all_todos_for_user:{user_id}")
+    cache_invalidate_pattern(f"todo:get_todo_by_id_and_owner:{todo_id}:{user_id}")
+
 
 @router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 @require_auth
@@ -205,6 +252,11 @@ async def delete_todo(user: user_dependency, db: db_dependency, todo_id: int = P
     if todo_model is None:
         raise HTTPException(status_code=404, detail="Todo not found.")
 
-    # Delete the todo
-    db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).delete()
+    # Delete the todo - use the model directly instead of querying again
+    db.delete(todo_model)
     db.commit()
+
+    # Invalidate cache for this user's todos and this specific todo
+    user_id = user.get('id')
+    cache_invalidate_pattern(f"todos:get_all_todos_for_user:{user_id}")
+    cache_invalidate_pattern(f"todo:get_todo_by_id_and_owner:{todo_id}:{user_id}")

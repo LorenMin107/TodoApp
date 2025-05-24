@@ -15,6 +15,7 @@ from ...models import Users
 from ...password_validator import validate_password
 from ...email_utils import generate_verification_token, send_verification_email
 from ...sanitize import sanitize_user_input
+from ...cache import cache_invalidate_pattern
 
 from . import router
 from .token_manager import hash_password, db_dependency
@@ -173,6 +174,9 @@ async def verify_email(token: str, db: db_dependency):
     db.add(user)
     db.commit()
 
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{user.username}")
+
     # Redirect to the login page with a success message
     return RedirectResponse(
         url="/auth/login-page?verified=true",
@@ -208,6 +212,9 @@ async def resend_verification(request: ResendVerificationRequest, db: db_depende
     # Commit the changes to the database
     db.add(user)
     db.commit()
+
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{user.username}")
 
     # Send a new verification email
     send_verification_email(

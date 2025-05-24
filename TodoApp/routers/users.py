@@ -10,6 +10,7 @@ from ..database import SessionLocal
 from .auth.token_manager import get_current_user_from_cookie, verify_password, hash_password
 from ..password_validator import validate_password
 from ..sanitize import sanitize_html
+from ..cache import cache_invalidate_pattern
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter(
@@ -67,6 +68,9 @@ async def change_password(user: user_dependency, db: db_dependency, user_verific
     db.add(user_model)
     db.commit()
 
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{user_model.username}")
+
 
 @router.put('/phonenumber/{phone_number}', status_code=status.HTTP_204_NO_CONTENT)
 async def change_phone_number(user: user_dependency, db: db_dependency, phone_number: str):
@@ -78,6 +82,9 @@ async def change_phone_number(user: user_dependency, db: db_dependency, phone_nu
     user_model.phone_number = sanitized_phone_number
     db.add(user_model)
     db.commit()
+
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{user_model.username}")
 
 
 @router.get('/profile')

@@ -18,6 +18,7 @@ from starlette.responses import RedirectResponse
 
 from ...models import Users
 from ...totp import setup_totp, verify_totp
+from ...cache import cache_invalidate_pattern
 
 from . import router
 from .token_manager import (
@@ -202,6 +203,9 @@ async def verify_2fa_setup(
     db.add(user)
     db.commit()
 
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{user.username}")
+
     # Remove the session
     pending_2fa_sessions.pop(session_id, None)
 
@@ -333,6 +337,9 @@ async def disable_2fa(
     db_user.totp_secret = None
     db.add(db_user)
     db.commit()
+
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{db_user.username}")
 
     # Return success
     return {"message": "Two-factor authentication has been disabled successfully"}

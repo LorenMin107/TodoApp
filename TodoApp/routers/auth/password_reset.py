@@ -16,6 +16,7 @@ from starlette.responses import RedirectResponse
 from ...models import Users
 from ...password_validator import validate_password
 from ...email_utils import generate_password_reset_token, send_password_reset_email
+from ...cache import cache_invalidate_pattern
 
 from . import router
 from .token_manager import hash_password, db_dependency
@@ -177,6 +178,9 @@ async def reset_password(token: str, password_reset: PasswordReset, db: db_depen
     # Commit the changes to the database
     db.add(user)
     db.commit()
+
+    # Invalidate cache for this user
+    cache_invalidate_pattern(f"auth:get_user_by_username:{user.username}")
 
     # Return success
     return {"message": "Password has been reset successfully. You can now log in with your new password."}

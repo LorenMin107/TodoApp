@@ -17,6 +17,7 @@ from starlette import status
 from ...models import Users
 from ...rate_limiter import check_rate_limit, record_failed_attempt, reset_attempts
 from ...email_utils import generate_verification_token, send_verification_email
+from ...cache import cached, cache_invalidate_pattern
 
 from . import router
 from .token_manager import (
@@ -95,6 +96,23 @@ async def verify_recaptcha(recaptcha_response: str, action: str = None) -> bool:
 
         return False
 
+@cached(key_prefix="auth", ttl=30)  # Cache for 30 seconds
+def get_user_by_username(username: str, db):
+    """
+    Get a user by username.
+
+    This function is cached to improve performance for repeated lookups.
+
+    Args:
+        username: The username of the user
+        db: The database session
+
+    Returns:
+        The user object if found, None otherwise
+    """
+    return db.query(Users).filter(Users.username == username).first()
+
+
 def authenticate_user(username: str, password: str, db):
     """
     Authenticate a user with the given username and password.
@@ -107,7 +125,8 @@ def authenticate_user(username: str, password: str, db):
     Returns:
         The user object if authentication is successful, False otherwise
     """
-    user = db.query(Users).filter(Users.username == username).first()
+    # Use the cached function to get the user
+    user = get_user_by_username(username, db)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -182,6 +201,9 @@ async def login_for_access_token(
         user.verification_token = verification_token
         db.add(user)
         db.commit()
+
+        # Invalidate cache for this user
+        cache_invalidate_pattern(f"auth:get_user_by_username:{user.username}")
 
         # Send a new verification email
         send_verification_email(

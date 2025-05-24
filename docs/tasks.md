@@ -82,10 +82,14 @@ This document contains a prioritized list of actionable tasks to improve the Sec
 
 ## Performance Improvements
 
-14. [ ] Optimize database queries
-    - Add indexes for frequently queried fields
-    - Review and optimize ORM queries
-    - Implement query caching where appropriate
+14. [x] Optimize database queries
+    - Add indexes for frequently queried fields ✓
+    - Review and optimize ORM queries ✓
+    - Implement query caching where appropriate ✓
+    - Added indexes to email, username, role, verification_token, and password_reset_token in Users table
+    - Added indexes to priority, complete, and owner_id in Todos table
+    - Implemented caching for frequently accessed queries with appropriate TTLs
+    - Added cache invalidation for all functions that modify data
 
 15. [ ] Implement caching
     - Add Redis or in-memory caching for frequently accessed data
