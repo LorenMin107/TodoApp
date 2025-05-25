@@ -38,6 +38,14 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
 - Delete any todo item
 - User management (future enhancement)
 
+## Documentation
+
+- **Flowcharts**: Comprehensive flowcharts showing the application architecture and user flows are available in the [docs/flowchart.md](docs/flowchart.md) file. These include:
+  - Application Architecture
+  - Authentication Flow
+  - Todo Management Flow
+  - Admin Flow
+
 ## Technologies Used
 
 - **Backend**: FastAPI, Python 3.8+
