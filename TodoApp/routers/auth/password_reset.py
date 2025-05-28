@@ -35,43 +35,14 @@ class PasswordReset(BaseModel):
 # Routes
 @router.get("/forgot-password-page")
 def render_forgot_password_page(request: Request):
-    """
-    Render the forgot password page.
-
-    Args:
-        request: The request object
-
-    Returns:
-        The rendered forgot password page
-    """
     return templates.TemplateResponse("forgot-password.html", {"request": request})
 
 @router.get("/reset-password-page")
 def render_reset_password_page(request: Request, token: str):
-    """
-    Render the reset password page.
-
-    Args:
-        request: The request object
-        token: The password reset token
-
-    Returns:
-        The rendered reset password page
-    """
     return templates.TemplateResponse("reset-password.html", {"request": request, "token": token})
 
 @router.post("/forgot-password")
 async def forgot_password(request: PasswordResetRequest, db: db_dependency):
-    """
-    Request a password reset.
-
-    Args:
-        request: The request containing the email address
-        db: The database session
-
-    Returns:
-        A dictionary with a success message
-    """
     # Find the user with this email
     user = db.query(Users).filter(Users.email == request.email).first()
 
@@ -99,17 +70,6 @@ async def forgot_password(request: PasswordResetRequest, db: db_dependency):
 
 @router.get("/reset-password")
 async def reset_password_page(token: str, request: Request, db: db_dependency):
-    """
-    Verify a password reset token and render the reset password page.
-
-    Args:
-        token: The password reset token
-        request: The request object
-        db: The database session
-
-    Returns:
-        The rendered reset password page or a redirect to the login page with an error message
-    """
     # Find the user with this reset token
     user = db.query(Users).filter(Users.password_reset_token == token).first()
 
@@ -130,17 +90,6 @@ async def reset_password_page(token: str, request: Request, db: db_dependency):
 
 @router.post("/reset-password")
 async def reset_password(token: str, password_reset: PasswordReset, db: db_dependency):
-    """
-    Reset a user's password.
-
-    Args:
-        token: The password reset token
-        password_reset: The new password data
-        db: The database session
-
-    Returns:
-        A dictionary with a success message
-    """
     # Find the user with this reset token
     user = db.query(Users).filter(Users.password_reset_token == token).first()
 

@@ -4,6 +4,10 @@ This document contains flowcharts representing the architecture and flow of the 
 
 ## Application Architecture
 
+The SecureTodo application architecture is divided into several logical components:
+
+### Client and Middleware Layer
+
 ```mermaid
 graph TD
     %% Client Layer
@@ -16,81 +20,72 @@ graph TD
     end
     FastAPI --> CSP
     FastAPI --> CSRF
+```
 
+### Router Layer
+
+```mermaid
+graph TD
     %% Router Layer
-    subgraph Routers
-        AuthRouter[Auth Router]
-        TodosRouter[Todos Router]
-        AdminRouter[Admin Router]
-        UsersRouter[Users Router]
-    end
-    FastAPI --> AuthRouter
-    FastAPI --> TodosRouter
-    FastAPI --> AdminRouter
-    FastAPI --> UsersRouter
+    FastAPI[FastAPI Application] --> AuthRouter[Auth Router]
+    FastAPI --> TodosRouter[Todos Router]
+    FastAPI --> AdminRouter[Admin Router]
+    FastAPI --> UsersRouter[Users Router]
+```
 
+### Authentication Components
+
+```mermaid
+graph TD
     %% Auth Components
-    subgraph Auth Modules
-        Login[Login Module]
-        Registration[Registration Module]
-        PasswordReset[Password Reset Module]
-        TwoFactor[Two-Factor Auth Module]
-        TokenManager[Token Manager]
-    end
-    AuthRouter --> Login
-    AuthRouter --> Registration
-    AuthRouter --> PasswordReset
-    AuthRouter --> TwoFactor
-    AuthRouter --> TokenManager
+    AuthRouter[Auth Router] --> Login[Login Module]
+    AuthRouter --> Registration[Registration Module]
+    AuthRouter --> PasswordReset[Password Reset Module]
+    AuthRouter --> TwoFactor[Two-Factor Auth Module]
+    AuthRouter --> TokenManager[Token Manager]
 
     %% Security Components
-    subgraph Security
-        PasswordValidator[Password Validator]
-        RateLimiter[Rate Limiter]
-    end
-    Login --> PasswordValidator
+    Login --> PasswordValidator[Password Validator]
     Registration --> PasswordValidator
     PasswordReset --> PasswordValidator
-    Login --> RateLimiter
+    Login --> RateLimiter[Rate Limiter]
     Registration --> RateLimiter
 
-    %% Database Layer
-    subgraph Database Layer
-        Database[(Database)]
-        Users[Users Model]
-        Todos[Todos Model]
-        ActivityLog[Activity Log Model]
-        RevokedTokens[Revoked Tokens Model]
-    end
-    TodosRouter --> |CRUD Operations| Database
-    AuthRouter --> |User Operations| Database
-    AdminRouter --> |Admin Operations| Database
-    UsersRouter --> |User Management| Database
-    Database --> Users
-    Database --> Todos
-    Database --> ActivityLog
-    Database --> RevokedTokens
-
-    %% Utilities
-    subgraph Utilities
-        ActivityLogger[Activity Logger]
-        Cache[Cache]
-    end
-    TodosRouter --> ActivityLogger
-    AuthRouter --> ActivityLogger
-    AdminRouter --> ActivityLogger
-    UsersRouter --> ActivityLogger
-    TodosRouter --> Cache
-
-    %% Email
-    subgraph Email
-        EmailUtils[Email Utilities]
-    end
-    PasswordReset --> EmailUtils
+    %% Email Integration
+    PasswordReset --> EmailUtils[Email Utilities]
     Registration --> EmailUtils
 ```
 
-## Authentication Flow
+### Database Layer
+
+```mermaid
+graph TD
+    %% Database Layer
+    TodosRouter[Todos Router] --> |CRUD Operations| Database[(Database)]
+    AuthRouter[Auth Router] --> |User Operations| Database
+    AdminRouter[Admin Router] --> |Admin Operations| Database
+    UsersRouter[Users Router] --> |User Management| Database
+
+    Database --> Users[Users Model]
+    Database --> Todos[Todos Model]
+    Database --> ActivityLog[Activity Log Model]
+    Database --> RevokedTokens[Revoked Tokens Model]
+```
+
+### Utilities Layer
+
+```mermaid
+graph TD
+    %% Utilities
+    TodosRouter[Todos Router] --> ActivityLogger[Activity Logger]
+    AuthRouter[Auth Router] --> ActivityLogger
+    AdminRouter[Admin Router] --> ActivityLogger
+    UsersRouter[Users Router] --> ActivityLogger
+
+    TodosRouter --> Cache[Cache]
+```
+
+## Registration Process
 
 ```mermaid
 sequenceDiagram
@@ -99,49 +94,68 @@ sequenceDiagram
     participant App as SecureTodo App
     participant DB as Database
 
-    %% Registration Flow
     User->>Browser: Opens register page
     Browser->>App: GET /auth/register-page
     App->>Browser: Return Registration Form
-    User->>Browser: Submits registration form
+    User->>Browser: Submits form
     Browser->>App: POST /auth/register
-    App->>App: Validates input
-    App->>App: Hashes password
-    App->>DB: Stores user
-    App->>Browser: Redirects to login
-
-    %% Login Flow with optional 2FA
-    User->>Browser: Submits login form
-    Browser->>App: POST /auth/login
-    App->>DB: Verifies credentials
-
-    alt 2FA is enabled
-        App->>Browser: Redirect to 2FA page
-        User->>Browser: Enter 2FA code
-        Browser->>App: POST /auth/verify-2fa
-        App->>App: Verifies 2FA code
-    end
-
-    App->>App: Issues JWT token
-    App->>Browser: Set cookie & redirect to todos
-
-    %% Password Reset Flow
-    User->>Browser: Requests password reset
-    Browser->>App: POST /auth/request-password-reset
-    App->>App: Generates reset token
-    App->>DB: Stores reset token
-    App->>User: Sends email with reset link
-    User->>Browser: Clicks reset link
-    Browser->>App: GET /auth/reset-password/{token}
-    App->>Browser: Return new password form
-    User->>Browser: Sets new password
-    Browser->>App: POST /auth/reset-password
-    App->>App: Hashes new password
-    App->>DB: Updates password
+    App->>App: Validates, hashes password, generates token
+    App->>DB: Stores in DB
+    App->>User: Sends email
+    User->>Browser: Clicks verification link
+    Browser->>App: GET /auth/verify-email?token=xyz
+    App->>App: Verifies token
     App->>Browser: Redirects to login
 ```
 
-## Todo Management Flow
+## Login Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+
+    User->>Browser: Submits credentials
+    Browser->>App: POST /auth/login
+    App->>DB: Checks DB
+
+    alt 2FA is enabled
+        App->>Browser: Redirect to 2FA input
+        User->>Browser: Enters 2FA code
+        Browser->>App: POST /auth/verify-2fa
+        App->>App: Verifies
+    end
+
+    App->>App: Issues JWT, sets cookie
+    App->>Browser: Redirect to todos
+```
+
+## Password Reset Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+
+    User->>Browser: Requests reset
+    Browser->>App: POST /auth/request-password-reset
+    App->>App: Generates token
+    App->>DB: Stores in DB
+    App->>User: Sends reset link via email
+    User->>Browser: Opens reset form
+    Browser->>App: GET /auth/reset-password/{token}
+    App->>Browser: Return password form
+    User->>Browser: Submits new password
+    Browser->>App: POST /auth/reset-password
+    App->>App: Hashes and updates DB
+    App->>Browser: Redirect to login
+```
+
+## Viewing Todos
 
 ```mermaid
 sequenceDiagram
@@ -151,54 +165,72 @@ sequenceDiagram
     participant DB as Database
     participant Cache
 
-    %% Viewing Todos
-    User->>Browser: Navigate to Todos
-    Browser->>App: GET /todos/todo-page
-    App->>App: Verify Authentication
-    App->>Cache: Check cache
+    App->>Cache: Checks cache
 
-    alt Cache Miss
-        App->>DB: Fallback to DB query
-        App->>Cache: Store in Cache
+    alt On miss
+        App->>DB: Queries DB
+        App->>Cache: Caches result
     end
 
-    App->>Browser: Return todos
-
-    %% Adding a Todo
-    User->>Browser: Click "Add Todo"
-    Browser->>App: GET /todos/add-todo-page
-    App->>Browser: Render form
-    User->>Browser: Fill Todo Form
-    Browser->>App: Submit data
-    App->>App: Sanitize input
-    App->>DB: Save to DB
-    App->>Cache: Invalidate cache
-    App->>App: Log action
-    App->>Browser: Redirect to Todos Page
-
-    %% Editing a Todo
-    User->>Browser: Click "Edit" on Todo
-    Browser->>App: GET /todos/edit-todo-page/{id}
-    App->>DB: Fetch existing data
-    App->>Browser: Return Edit Form
-    User->>Browser: Update Todo
-    Browser->>App: PUT /todos/{id}
-    App->>App: Sanitize input
-    App->>DB: Update after sanitizing
-    App->>Cache: Invalidate cache
-    App->>App: Log
-    App->>Browser: Redirect to Todos Page
-
-    %% Deleting a Todo
-    User->>Browser: Click "Delete" on Todo
-    Browser->>App: DELETE /todos/{id}
-    App->>DB: Delete from DB
-    App->>Cache: Invalidate cache
-    App->>App: Log action
-    App->>Browser: Return Success
+    App->>Browser: Returns todos to browser
 ```
 
-## Admin Flow
+## Adding a Todo
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+    participant Cache
+
+    User->>Browser: Submits form
+    Browser->>App: POST /todos
+    App->>App: Sanitizes input
+    App->>DB: Stores in DB
+    App->>Cache: Invalidates cache
+    App->>App: Logs action
+    App->>Browser: Redirects user
+```
+
+## Editing a Todo
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+    participant Cache
+
+    User->>Browser: Loads form, updates data
+    Browser->>App: PUT /todos/{id}
+    App->>App: Sanitizes input
+    App->>DB: Updates DB
+    App->>Cache: Invalidates cache
+    App->>App: Logs action
+```
+
+## Deleting a Todo
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+    participant Cache
+
+    User->>Browser: Clicks delete
+    Browser->>App: DELETE /todos/{id}
+    App->>DB: Deletes from DB
+    App->>Cache: Invalidates cache
+    App->>App: Logs action
+    App->>Browser: Returns success
+```
+
+## Admin Dashboard Load
 
 ```mermaid
 sequenceDiagram
@@ -207,43 +239,48 @@ sequenceDiagram
     participant App as SecureTodo App
     participant DB as Database
 
-    %% Admin loads dashboard and gets user stats & logs
-    Admin->>Browser: Navigate to Admin Dashboard
+    Admin->>Browser: Accesses dashboard
     Browser->>App: GET /admin/dashboard
-    App->>App: Verify Admin Role
-    Note right of App: Role verification before admin action
-    App->>DB: Get User Statistics
-    App->>DB: Get Activity Logs
-    App->>Browser: Return Admin Dashboard
+    App->>App: Verifies role
+    App->>DB: Fetches stats + logs from DB
+    App->>Browser: Returns dashboard
+```
 
-    %% Admin manages users (view)
-    Admin->>Browser: Click "Manage Users"
+## Admin Managing Users
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+
+    Admin->>Browser: Views all users
     Browser->>App: GET /admin/users
-    App->>App: Verify Admin Role
-    Note right of App: Role verification before admin action
-    App->>DB: Get All Users
-    App->>Browser: Return User Management Page
+    App->>App: Verifies role
+    App->>DB: Fetches users
+    App->>Browser: Returns user list
 
-    %% Admin manages users (edit)
-    Admin->>Browser: Click "Edit" on User
-    Browser->>App: GET /admin/users/{id}
-    App->>App: Verify Admin Role
-    Note right of App: Role verification before admin action
-    App->>DB: Get User Details
-    App->>Browser: Return Edit User Form
-    Admin->>Browser: Update User Details
+    Admin->>Browser: Edits one
     Browser->>App: PUT /admin/users/{id}
-    App->>App: Verify Admin Role
-    Note right of App: Role verification before admin action
-    App->>DB: Update User
-    App->>App: Log Activity
-    App->>Browser: Return Success
+    App->>App: Verifies role
+    App->>DB: Updates DB
+    App->>App: Logs activity
+    App->>Browser: Returns success
+```
 
-    %% Admin reviews activity logs
-    Admin->>Browser: Click "Activity Logs"
+## Admin Viewing Activity Logs
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Browser
+    participant App as SecureTodo App
+    participant DB as Database
+
+    Admin->>Browser: Accesses log page
     Browser->>App: GET /admin/activity-logs
-    App->>App: Verify Admin Role
-    Note right of App: Role verification before admin action
-    App->>DB: Get Activity Logs
-    App->>Browser: Return Activity Logs Page
+    App->>App: Verifies role
+    App->>DB: Fetches logs from DB
+    App->>Browser: Returns log page
 ```

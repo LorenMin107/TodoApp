@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 from ..models import Todos, Users, ActivityLog
 from ..database import SessionLocal
-from .auth.token_manager import get_current_user_from_cookie
+from .auth.token_manager import get_current_user_from_cookie, get_current_user
 from ..activity_logger import log_activity
 
 router = APIRouter(

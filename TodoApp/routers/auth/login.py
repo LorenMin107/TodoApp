@@ -31,21 +31,11 @@ templates = Jinja2Templates(directory="TodoApp/templates")
 
 # Standard reCAPTCHA v2 configuration test keys
 RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-# The secret key for your reCAPTCHA v2 test site key
+# The secret key for reCAPTCHA v2 test site key
 RECAPTCHA_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
 
 
 async def verify_recaptcha(recaptcha_response: str, action: str = None) -> bool:
-    """
-    Verify a reCAPTCHA response.
-
-    Args:
-        recaptcha_response: The reCAPTCHA response from the client
-        action: The action to verify (not used in reCAPTCHA v2)
-
-    Returns:
-        True if the reCAPTCHA response is valid, False otherwise
-    """
     if not recaptcha_response:
         return False
 
@@ -97,35 +87,13 @@ async def verify_recaptcha(recaptcha_response: str, action: str = None) -> bool:
 
         return False
 
+
 @cached(key_prefix="auth", ttl=30)  # Cache for 30 seconds
 def get_user_by_username(username: str, db):
-    """
-    Get a user by username.
-
-    This function is cached to improve performance for repeated lookups.
-
-    Args:
-        username: The username of the user
-        db: The database session
-
-    Returns:
-        The user object if found, None otherwise
-    """
     return db.query(Users).filter(Users.username == username).first()
 
 
 def authenticate_user(username: str, password: str, db):
-    """
-    Authenticate a user with the given username and password.
-
-    Args:
-        username: The username of the user
-        password: The password of the user
-        db: The database session
-
-    Returns:
-        The user object if authentication is successful, False otherwise
-    """
     # Use the cached function to get the user
     user = get_user_by_username(username, db)
     if not user:
@@ -137,19 +105,12 @@ def authenticate_user(username: str, password: str, db):
         return False
     return user
 
+
 # Routes
 @router.get("/login-page")
 def render_login_page(request: Request):
-    """
-    Render the login page.
-
-    Args:
-        request: The request object
-
-    Returns:
-        The rendered login page
-    """
     return templates.TemplateResponse("login.html", {"request": request})
+
 
 @router.post("/token")
 async def login_for_access_token(
@@ -160,19 +121,6 @@ async def login_for_access_token(
         g_recaptcha_response: str = Form(None)
 ):
     from datetime import timedelta
-    """
-    Handle login requests and issue access and refresh tokens.
-
-    Args:
-        request: The request object
-        response: The response object
-        form_data: The form data containing username and password
-        db: The database session
-        g_recaptcha_response: The reCAPTCHA response from the client
-
-    Returns:
-        A dictionary containing the access token, refresh token, and token type
-    """
     # Get reCAPTCHA response from query parameters if not in form data
     if g_recaptcha_response is None:
         g_recaptcha_response = request.query_params.get("g_recaptcha_response")
@@ -182,7 +130,8 @@ async def login_for_access_token(
     if not recaptcha_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Security verification failed. Please check the reCAPTCHA box and try again. If the problem persists, refresh the page."
+            detail="Security verification failed. Please check the reCAPTCHA box and try again. "
+                   "If the problem persists, refresh the page."
         )
 
     # Check if the request is rate-limited before processing
@@ -275,18 +224,18 @@ async def login_for_access_token(
 
     # Create access token (short-lived, 10 minutes)
     access_token, access_jti, access_exp = create_access_token(
-        user.username, 
-        user.id, 
-        user.role, 
+        user.username,
+        user.id,
+        user.role,
         timedelta(minutes=10),  # Reduced from 20 minutes to 10 minutes
         user_agent
     )
 
     # Create a refresh token (long-lived, 7 days)
     refresh_token, refresh_jti, refresh_exp = create_refresh_token(
-        user.username, 
-        user.id, 
-        user.role, 
+        user.username,
+        user.id,
+        user.role,
         timedelta(days=7),
         user_agent
     )
@@ -305,26 +254,15 @@ async def login_for_access_token(
 
     return {'access_token': access_token, 'refresh_token': refresh_token, 'token_type': 'bearer'}
 
+
 @router.post("/refresh-token")
 async def refresh_access_token(
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-    refresh_token: str = Cookie(None)
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+        refresh_token: str = Cookie(None)
 ):
     from datetime import timedelta
-    """
-    Refresh an access token using a refresh token.
-
-    Args:
-        request: The request object
-        response: The response object
-        db: The database session
-        refresh_token: The refresh token cookie
-
-    Returns:
-        A dictionary containing the new access token and token type
-    """
     from jose import jwt, JWTError
     from .token_manager import SECRET_KEY, ALGORITHM, is_token_revoked, hash_user_agent, create_access_token
 
@@ -371,7 +309,7 @@ async def refresh_access_token(
             # Compare fingerprints
             if token_fingerprint != current_fingerprint:
                 raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Token was issued for a different device or browser"
                 )
 
@@ -429,27 +367,15 @@ async def refresh_access_token(
             detail="Invalid refresh token"
         )
 
+
 @router.get("/logout")
 async def logout(
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db), 
-    access_token: str = Cookie(None),
-    refresh_token: str = Cookie(None)
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+        access_token: str = Cookie(None),
+        refresh_token: str = Cookie(None)
 ):
-    """
-    Log out a user by revoking their tokens and clearing cookies.
-
-    Args:
-        request: The request object
-        response: The response object
-        db: The database session
-        access_token: The access token cookie
-        refresh_token: The refresh token cookie
-
-    Returns:
-        A dictionary with a success message
-    """
     from jose import jwt, JWTError
     from .token_manager import SECRET_KEY, ALGORITHM, revoke_token
     from datetime import datetime, timezone
@@ -501,7 +427,7 @@ async def logout(
     # Clear the refresh_token cookie
     response.delete_cookie(key="refresh_token", path="/auth/")
 
-    # Log the logout activity if we have user information
+    # Log the logout activity
     if user_id and username:
         log_activity(
             db=db,
@@ -513,6 +439,7 @@ async def logout(
 
     # Return success
     return {"status": "success"}
+
 
 # Register routes with the router
 router.add_api_route("/login-page", render_login_page, methods=["GET"])

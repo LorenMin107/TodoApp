@@ -40,15 +40,6 @@ class TOTPSetupResponse(BaseModel):
     qr_code: str
 
 def check_pending_2fa_session(request: Request) -> Tuple[bool, Optional[str]]:
-    """
-    Check if there is a pending 2FA session.
-
-    Args:
-        request: The request object
-
-    Returns:
-        A tuple containing a boolean indicating if there is a valid session and the session ID
-    """
     # Get the 2FA session cookie
     session_id = request.cookies.get("2fa_session")
 
@@ -73,17 +64,6 @@ def check_pending_2fa_session(request: Request) -> Tuple[bool, Optional[str]]:
 @router.get("/setup-2fa-page")
 async def setup_2fa_page(request: Request, user: dict = Depends(get_current_user_from_cookie),
                          db: Session = Depends(get_db)):
-    """
-    Render the 2FA setup page.
-
-    Args:
-        request: The request object
-        user: The current user
-        db: The database session
-
-    Returns:
-        The rendered 2FA setup page
-    """
     if user is None:
         return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -124,16 +104,6 @@ async def setup_2fa_page(request: Request, user: dict = Depends(get_current_user
 
 @router.get("/verify-2fa-page")
 async def verify_2fa_page(request: Request, session_id: str = Cookie(None, alias="2fa_session")):
-    """
-    Render the 2FA verification page.
-
-    Args:
-        request: The request object
-        session_id: The 2FA session ID
-
-    Returns:
-        The rendered 2FA verification page
-    """
     # Check if the session exists and is valid
     if session_id not in pending_2fa_sessions:
         return RedirectResponse(url="/auth/login-page", status_code=status.HTTP_303_SEE_OTHER)
@@ -154,17 +124,6 @@ async def verify_2fa_setup(
         db: Session = Depends(get_db),
         session_id: str = Cookie(None, alias="setup_2fa_session")
 ):
-    """
-    Verify the 2FA setup.
-
-    Args:
-        request: The request containing the TOTP token
-        db: The database session
-        session_id: The 2FA setup session ID
-
-    Returns:
-        A dictionary with a success message
-    """
     # Check if the session exists and is valid
     if session_id not in pending_2fa_sessions:
         raise HTTPException(
@@ -230,19 +189,6 @@ async def verify_2fa(
         db: Session = Depends(get_db),
         session_id: str = Cookie(None, alias="2fa_session")
 ):
-    """
-    Verify a 2FA code during login.
-
-    Args:
-        totp_request: The request containing the TOTP token
-        request: The request object
-        response: The response object
-        db: The database session
-        session_id: The 2FA session ID
-
-    Returns:
-        A dictionary with a success message
-    """
     # Check if the session exists and is valid
     if session_id not in pending_2fa_sessions:
         raise HTTPException(
@@ -320,16 +266,6 @@ async def disable_2fa(
         db: Session = Depends(get_db),
         user: dict = Depends(get_current_user_from_cookie)
 ):
-    """
-    Disable 2FA for a user.
-
-    Args:
-        db: The database session
-        user: The current user
-
-    Returns:
-        A dictionary with a success message
-    """
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

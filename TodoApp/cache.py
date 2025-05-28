@@ -23,22 +23,12 @@ DEFAULT_TTL = 300
 
 
 def cache_clear():
-    """Clear the entire cache."""
     with _cache_lock:
         _cache.clear()
     logger.debug("Cache cleared")
 
 
 def cache_get(key: str) -> Optional[Any]:
-    """
-    Get a value from the cache.
-
-    Args:
-        key: The cache key
-
-    Returns:
-        The cached value or None if the key is not in the cache or has expired
-    """
     with _cache_lock:
         if key in _cache:
             value, expiry = _cache[key]
@@ -55,14 +45,6 @@ def cache_get(key: str) -> Optional[Any]:
 
 
 def cache_set(key: str, value: Any, ttl: int = DEFAULT_TTL):
-    """
-    Set a value in the cache.
-
-    Args:
-        key: The cache key
-        value: The value to cache
-        ttl: Time-to-live in seconds
-    """
     with _cache_lock:
         expiry = time.time() + ttl
         _cache[key] = (value, expiry)
@@ -70,12 +52,6 @@ def cache_set(key: str, value: Any, ttl: int = DEFAULT_TTL):
 
 
 def cache_delete(key: str):
-    """
-    Delete a value from the cache.
-
-    Args:
-        key: The cache key
-    """
     with _cache_lock:
         if key in _cache:
             del _cache[key]
@@ -83,12 +59,6 @@ def cache_delete(key: str):
 
 
 def cache_invalidate_pattern(pattern: str):
-    """
-    Invalidate all cache keys that match the given pattern.
-
-    Args:
-        pattern: The pattern to match (simple substring match)
-    """
     with _cache_lock:
         keys_to_delete = [k for k in _cache.keys() if pattern in k]
         for key in keys_to_delete:
@@ -99,16 +69,6 @@ def cache_invalidate_pattern(pattern: str):
 
 
 def cached(key_prefix: str, ttl: int = DEFAULT_TTL):
-    """
-    Decorator for caching function results.
-
-    Args:
-        key_prefix: Prefix for the cache key
-        ttl: Time-to-live in seconds
-
-    Returns:
-        Decorated function
-    """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -141,16 +101,6 @@ def cached(key_prefix: str, ttl: int = DEFAULT_TTL):
 
 
 def async_cached(key_prefix: str, ttl: int = DEFAULT_TTL):
-    """
-    Decorator for caching async function results.
-
-    Args:
-        key_prefix: Prefix for the cache key
-        ttl: Time-to-live in seconds
-
-    Returns:
-        Decorated async function
-    """
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -196,12 +146,6 @@ def _cleanup_cache():
 
 
 def start_cache_cleanup(interval: int = 60):
-    """
-    Start a background thread to periodically clean up expired cache entries.
-
-    Args:
-        interval: Cleanup interval in seconds
-    """
     def cleanup_thread():
         while True:
             time.sleep(interval)

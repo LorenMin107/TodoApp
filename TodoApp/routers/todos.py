@@ -10,7 +10,7 @@ from fastapi import Depends, HTTPException, Path, APIRouter, Request
 from starlette import status
 from ..models import Todos
 from ..database import SessionLocal
-from .auth.token_manager import get_current_user_from_cookie
+from .auth.token_manager import get_current_user_from_cookie, get_current_user
 from .auth.two_factor import check_pending_2fa_session
 from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -145,50 +145,16 @@ async def render_edit_todo_page(request: Request, todo_id: int, db: db_dependenc
 ### Database query utility functions ###
 @cached(key_prefix="todos", ttl=60)  # Cache for 1 minute
 def get_all_todos_for_user(db: Session, user_id: int) -> List[Todos]:
-    """
-    Get all todos for a user.
-
-    Args:
-        db: The database session
-        user_id: The ID of the user
-
-    Returns:
-        A list of todos belonging to the user
-    """
     return db.query(Todos).filter(Todos.owner_id == user_id).all()
 
 
 @cached(key_prefix="todo", ttl=60)  # Cache for 1 minute
 def get_todo_by_id_and_owner(db: Session, todo_id: int, owner_id: int) -> Todos:
-    """
-    Get a todo by ID and owner ID.
-
-    Args:
-        db: The database session
-        todo_id: The ID of the todo
-        owner_id: The ID of the owner
-
-    Returns:
-        The todo if found, None otherwise
-    """
     return db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == owner_id).first()
 
 
 # This function should only be used in admin contexts or when owner verification is done separately
 def get_todo_by_id(db: Session, todo_id: int) -> Todos:
-    """
-    Get a todo by ID without checking ownership.
-
-    WARNING: This function should only be used in admin contexts or when owner verification
-    is done separately to avoid security issues.
-
-    Args:
-        db: The database session
-        todo_id: The ID of the todo
-
-    Returns:
-        The todo if found, None otherwise
-    """
     return db.query(Todos).filter(Todos.id == todo_id).first()
 
 

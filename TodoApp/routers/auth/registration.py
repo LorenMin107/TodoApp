@@ -24,6 +24,7 @@ from .login import verify_recaptcha
 # Templates for rendering pages
 templates = Jinja2Templates(directory="TodoApp/templates")
 
+
 # Request models
 class CreateUserRequest(BaseModel):
     username: str
@@ -33,22 +34,16 @@ class CreateUserRequest(BaseModel):
     password: str
     phone_number: str
 
+
 class ResendVerificationRequest(BaseModel):
     email: str
+
 
 # Routes
 @router.get("/register-page")
 def render_register_page(request: Request):
-    """
-    Render the registration page.
-
-    Args:
-        request: The request object
-
-    Returns:
-        The rendered registration page
-    """
     return templates.TemplateResponse("register.html", {"request": request})
+
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(
@@ -57,18 +52,6 @@ async def create_user(
         create_user_request: CreateUserRequest,
         g_recaptcha_response: str = None
 ):
-    """
-    Create a new user.
-
-    Args:
-        request: The request object
-        db: The database session
-        create_user_request: The user data
-        g_recaptcha_response: The reCAPTCHA response from the client
-
-    Returns:
-        A dictionary with a success message
-    """
     # Get reCAPTCHA response from query parameters
     if g_recaptcha_response is None:
         g_recaptcha_response = request.query_params.get("g_recaptcha_response")
@@ -78,7 +61,8 @@ async def create_user(
     if not recaptcha_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Security verification failed. Please check the reCAPTCHA box and try again. If the problem persists, refresh the page."
+            detail="Security verification failed. Please check the reCAPTCHA box and try again. "
+                   "If the problem persists, refresh the page."
         )
 
     # Validate password strength
@@ -144,18 +128,9 @@ async def create_user(
     # Return success with a message about verification
     return {"message": "User created successfully. Please check your email to verify your account."}
 
+
 @router.get("/verify-email")
 async def verify_email(token: str, db: db_dependency):
-    """
-    Verify a user's email address.
-
-    Args:
-        token: The verification token
-        db: The database session
-
-    Returns:
-        A redirect to the login page with a success message
-    """
     # Find the user with this verification token
     user = db.query(Users).filter(Users.verification_token == token).first()
 
@@ -183,18 +158,9 @@ async def verify_email(token: str, db: db_dependency):
         status_code=status.HTTP_303_SEE_OTHER
     )
 
+
 @router.post("/resend-verification")
 async def resend_verification(request: ResendVerificationRequest, db: db_dependency):
-    """
-    Resend a verification email.
-
-    Args:
-        request: The request containing the email address
-        db: The database session
-
-    Returns:
-        A dictionary with a success message
-    """
     # Find the user with this email
     user = db.query(Users).filter(Users.email == request.email).first()
 
@@ -224,6 +190,7 @@ async def resend_verification(request: ResendVerificationRequest, db: db_depende
     )
 
     return {"message": "A new verification email has been sent. Please check your inbox."}
+
 
 # Register routes with the router
 router.add_api_route("/register-page", render_register_page, methods=["GET"])

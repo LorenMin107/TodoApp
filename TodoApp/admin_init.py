@@ -12,12 +12,6 @@ from .models import Users
 from .routers.auth.token_manager import hash_password
 
 def initialize_admin_user(db: Session):
-    """
-    Initialize the admin user if it doesn't exist.
-    
-    Args:
-        db: The database session
-    """
     # Get admin email and password from environment variables
     admin_email = os.environ.get('SUPERADMIN_EMAIL')
     admin_password = os.environ.get('SUPERADMIN_PASSWORD')

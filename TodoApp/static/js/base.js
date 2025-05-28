@@ -50,7 +50,7 @@ async function handleFormSubmit(url, method, formData, contentType = "applicatio
                     errorContainer.style.display = "block";
 
                     // Scroll to the error message
-                    errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    errorContainer.scrollIntoView({behavior: 'smooth', block: 'center'});
                 } else {
                     // Fallback to alert if no container is found
                     alert(`Error: ${sanitizeClientSide(errorMessage)}`);
@@ -84,7 +84,7 @@ async function handleFormSubmit(url, method, formData, contentType = "applicatio
                 errorContainer.style.display = "block";
 
                 // Scroll to the error message
-                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                errorContainer.scrollIntoView({behavior: 'smooth', block: 'center'});
             } else {
                 // Fallback to alert if no container is found
                 alert(`Error: ${sanitizeClientSide(errorMessage)}`);
@@ -289,8 +289,8 @@ function showMessage(elementId, message, isError = true) {
     const alertDiv = document.getElementById(elementId);
     if (alertDiv) {
         // Create enhanced message with icon and formatting
-        const icon = isError 
-            ? '<i class="fas fa-exclamation-circle" aria-hidden="true"></i>' 
+        const icon = isError
+            ? '<i class="fas fa-exclamation-circle" aria-hidden="true"></i>'
             : '<i class="fas fa-check-circle" aria-hidden="true"></i>';
 
         const title = isError ? '<strong>Error:</strong> ' : '<strong>Success:</strong> ';
@@ -305,7 +305,7 @@ function showMessage(elementId, message, isError = true) {
             dismissButton.className = 'close';
             dismissButton.setAttribute('aria-label', 'Close');
             dismissButton.innerHTML = '<span aria-hidden="true">&times;</span>';
-            dismissButton.addEventListener('click', function() {
+            dismissButton.addEventListener('click', function () {
                 alertDiv.style.display = 'none';
             });
 
@@ -328,7 +328,7 @@ function showMessage(elementId, message, isError = true) {
         }
 
         // Scroll to the alert
-        alertDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        alertDiv.scrollIntoView({behavior: 'smooth', block: 'center'});
     } else {
         // Fallback to alert if the div is not found
         alert(sanitizeClientSide(message));

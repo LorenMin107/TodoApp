@@ -7,7 +7,7 @@ from starlette import status
 from starlette.responses import RedirectResponse
 from ..models import Users
 from ..database import SessionLocal
-from .auth.token_manager import get_current_user_from_cookie, verify_password, hash_password
+from .auth.token_manager import get_current_user_from_cookie, verify_password, hash_password, get_current_user
 from ..password_validator import validate_password
 from ..sanitize import sanitize_html
 from ..cache import cache_invalidate_pattern
