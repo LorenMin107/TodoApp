@@ -67,17 +67,17 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
 1. Clone the repository
    ```bash
    git clone https://github.com/LorenMin107/TodoApp.git
-   cd SecureTodo
+   cd TodoApp
    ```
 
 2. Create and activate a virtual environment
    ```bash
    # Windows
-   python -m venv fastapienv
+   python3 -m venv fastapienv
    fastapienv\Scripts\activate
 
    # macOS/Linux
-   python -m venv fastapienv
+   python3 -m venv fastapienv
    source fastapienv/bin/activate
    ```
 
@@ -116,9 +116,11 @@ SecureTodo is a robust, security-focused Todo application built with FastAPI. It
    > **IMPORTANT**: The `.env` file contains sensitive information and should **never** be committed to version control. 
    > The repository includes a `.gitignore` file that excludes `.env` files by default.
 
-5. Run the application
+5. Run the application (make sure you're in the root directory of the project)
    ```bash
-   uvicorn TodoApp.main:app --reload
+
+   #Using Python module
+   python3 -m TodoApp.main
    ```
 
 6. Access the application at http://localhost:8000
@@ -178,20 +180,6 @@ If you have admin privileges:
   - X-Frame-Options: Prevents clickjacking attacks
   - Referrer-Policy: Controls how much referrer information is included
   - X-XSS-Protection: Enables browser's built-in XSS filtering
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
 
